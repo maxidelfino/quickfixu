@@ -1,0 +1,435 @@
+// QuickFixU - Database Schema (DBML)
+// Versión: 2.0
+// Fecha: Marzo 2026
+// Para usar en: https://dbdiagram.io
+
+Project QuickFixU {
+  database_type: 'PostgreSQL'
+  Note: 'Modelo de datos completo marketplace bidireccional servicios profesionales'
+}
+
+// ============================================
+// TABLA: users
+// ============================================
+Table users {
+  id integer [pk, increment, note: 'Identificador único']
+  full_name varchar(255) [not null, note: 'Nombre completo (ej: Juan Pérez)']
+  email varchar(255) [unique, not null, note: 'Email único para login']
+  password_hash varchar(255) [not null, note: 'Bcrypt hash (cost 12)']
+  phone varchar(20) [not null, note: 'Formato: +54 9 11 4567-8901']
+  dni varchar(10) [not null, note: 'DNI argentino sin puntos']
+  address text [not null, note: 'Dirección completa']
+  latitude decimal(10,8) [not null, note: 'Latitud WGS84 (PostGIS)']
+  longitude decimal(11,8) [not null, note: 'Longitud WGS84 (PostGIS)']
+  profile_photo_url varchar(500) [null, note: 'URL Cloudinary']
+  rating decimal(3,2) [default: 0, note: 'Rating promedio 0.00-5.00 (calculado)']
+  oauth_provider varchar(50) [null, note: 'google / facebook / NULL']
+  oauth_id varchar(255) [null, note: 'ID del proveedor OAuth']
+  fcm_token varchar(500) [null, note: 'Token Firebase Cloud Messaging']
+  is_active boolean [default: true, note: 'FALSE si usuario baneado']
+  blocked_reason text [null, note: 'Motivo bloqueo (solo admin)']
+  created_at timestamp [default: `now()`, note: 'Fecha registro']
+  updated_at timestamp [default: `now()`, note: 'Última modificación']
+
+  indexes {
+    email [name: 'idx_users_email']
+    (latitude, longitude) [name: 'idx_users_location', type: gist, note: 'PostGIS spatial index']
+    is_active [name: 'idx_users_is_active']
+  }
+
+  Note: 'Tabla central usuarios (clientes Y profesionales). Role determinado por existencia en tabla professionals.'
+}
+
+// ============================================
+// TABLA: professionals
+// ============================================
+Table professionals {
+  id integer [pk, increment]
+  user_id integer [unique, not null, ref: - users.id, note: 'Relación 1-to-1 con users']
+  company_name varchar(255) [null, note: 'Nombre empresa (opcional)']
+  dni varchar(10) [not null, note: 'Duplicado de users.dni (denormalizado)']
+  hourly_rate decimal(10,2) [not null, note: 'Tarifa por hora en ARS']
+  available_schedule jsonb [not null, note: 'Horarios disponibilidad (JSON)']
+  credit_card_token varchar(255) [null, note: 'Token MercadoPago (cobro comisiones)']
+  is_verified boolean [default: false, note: 'TRUE si tiene certificación aprobada']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_professionals_user_id']
+    is_verified [name: 'idx_professionals_is_verified']
+    hourly_rate [name: 'idx_professionals_hourly_rate']
+  }
+
+  Note: 'Datos específicos profesionales. Si user_id existe aquí, el usuario es profesional.'
+}
+
+// ============================================
+// TABLA: categories
+// ============================================
+Table categories {
+  id integer [pk, increment]
+  name varchar(100) [unique, not null, note: 'Nombre mostrar (ej: Electricista)']
+  slug varchar(100) [unique, not null, note: 'URL-friendly (ej: electricista)']
+  icon_url varchar(500) [null, note: 'URL ícono SVG']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    slug [name: 'idx_categories_slug']
+  }
+
+  Note: 'Catálogo profesiones/categorías. Normalizado para evitar inconsistencias.'
+}
+
+// ============================================
+// TABLA: professional_categories (Pivot)
+// ============================================
+Table professional_categories {
+  professional_id integer [not null, ref: > professionals.id]
+  category_id integer [not null, ref: > categories.id]
+
+  indexes {
+    (professional_id, category_id) [pk, name: 'pk_professional_categories']
+    professional_id [name: 'idx_prof_cat_professional']
+    category_id [name: 'idx_prof_cat_category']
+  }
+
+  Note: 'Many-to-many: Un profesional puede tener múltiples categorías.'
+}
+
+// ============================================
+// TABLA: certifications
+// ============================================
+Table certifications {
+  id integer [pk, increment]
+  professional_id integer [not null, ref: > professionals.id]
+  certification_type varchar(100) [not null, note: 'Tipo (ej: Matrícula Gasista)']
+  certification_number varchar(100) [null, note: 'Número extraído OCR']
+  issue_date date [null, note: 'Fecha emisión']
+  expiry_date date [null, note: 'Fecha vencimiento']
+  document_url varchar(500) [not null, note: 'URL PDF/imagen Cloudinary']
+  ocr_data jsonb [null, note: 'Datos extraídos Tesseract.js (JSON)']
+  status varchar(20) [not null, default: 'pending', note: 'pending / approved / rejected']
+  reviewed_by integer [null, ref: > users.id, note: 'Admin que aprobó/rechazó']
+  reviewed_at timestamp [null]
+  rejection_reason text [null, note: 'Motivo rechazo (visible profesional)']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    professional_id [name: 'idx_cert_professional']
+    status [name: 'idx_cert_status']
+  }
+
+  Note: 'Certificaciones/matrículas profesionales. Validación OCR + aprobación manual admin.'
+}
+
+// ============================================
+// TABLA: posts
+// ============================================
+Table posts {
+  id integer [pk, increment]
+  user_id integer [not null, ref: > users.id, note: 'Cliente que publicó']
+  title varchar(100) [not null, note: 'Título problema']
+  description text [not null, note: 'Descripción detallada (max 500 chars)']
+  latitude decimal(10,8) [not null, note: 'Ubicación problema (PostGIS)']
+  longitude decimal(11,8) [not null, note: 'Ubicación problema']
+  status varchar(20) [not null, default: 'open', note: 'open / closed / expired / completed']
+  expires_at timestamp [not null, note: 'created_at + 48 horas']
+  deleted_at timestamp [null, note: 'Soft delete después 90 días']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_posts_user_id']
+    status [name: 'idx_posts_status']
+    (latitude, longitude) [name: 'idx_posts_location', type: gist]
+    expires_at [name: 'idx_posts_expires_at']
+    deleted_at [name: 'idx_posts_deleted_at']
+    created_at [name: 'idx_posts_created_at', type: btree]
+  }
+
+  Note: 'Publicaciones problemas por clientes. Visibles en feed profesionales.'
+}
+
+// ============================================
+// TABLA: post_categories (Pivot)
+// ============================================
+Table post_categories {
+  post_id integer [not null, ref: > posts.id]
+  category_id integer [not null, ref: > categories.id]
+
+  indexes {
+    (post_id, category_id) [pk, name: 'pk_post_categories']
+    post_id [name: 'idx_post_cat_post']
+    category_id [name: 'idx_post_cat_category']
+  }
+
+  Note: 'Many-to-many: Un post puede necesitar múltiples profesiones.'
+}
+
+// ============================================
+// TABLA: post_media
+// ============================================
+Table post_media {
+  id integer [pk, increment]
+  post_id integer [not null, ref: > posts.id]
+  media_type varchar(10) [not null, note: 'image / video']
+  media_url varchar(500) [not null, note: 'URL Cloudinary']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    post_id [name: 'idx_post_media_post_id']
+  }
+
+  Note: 'Imágenes/videos asociados a posts. Relación 1-to-many.'
+}
+
+// ============================================
+// TABLA: proposals
+// ============================================
+Table proposals {
+  id integer [pk, increment]
+  post_id integer [not null, ref: > posts.id]
+  professional_id integer [not null, ref: > professionals.id]
+  price decimal(10,2) [not null, note: 'Precio total trabajo en ARS']
+  description text [not null, note: 'Detalles oferta (max 300 chars)']
+  scheduled_date date [not null, note: 'Fecha propuesta trabajo']
+  scheduled_time time [not null, note: 'Hora propuesta trabajo']
+  status varchar(20) [not null, default: 'pending', note: 'pending / accepted / rejected / expired / cancelled']
+  expires_at timestamp [not null, note: 'created_at + 48 horas']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    post_id [name: 'idx_proposals_post_id']
+    professional_id [name: 'idx_proposals_professional_id']
+    status [name: 'idx_proposals_status']
+    expires_at [name: 'idx_proposals_expires_at']
+  }
+
+  Note: 'Presupuestos enviados por profesionales a posts de clientes.'
+}
+
+// ============================================
+// TABLA: appointments
+// ============================================
+Table appointments {
+  id integer [pk, increment]
+  proposal_id integer [unique, not null, ref: - proposals.id, note: 'Relación 1-to-1 con propuesta aceptada']
+  scheduled_date date [not null, note: 'Fecha trabajo (puede cambiar)']
+  scheduled_time time [not null, note: 'Hora trabajo']
+  status varchar(30) [not null, default: 'scheduled', note: 'scheduled / in_progress / completed / cancelled_by_client / cancelled_by_professional']
+  rescheduled_count integer [not null, default: 0, note: 'Cantidad reprogramaciones (max 2)']
+  cancellation_reason text [null, note: 'Motivo cancelación']
+  cancelled_by varchar(20) [null, note: 'client / professional']
+  penalty_applied boolean [default: false, note: 'TRUE si se aplicó penalización 15%']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    proposal_id [name: 'idx_appointments_proposal_id']
+    status [name: 'idx_appointments_status']
+    scheduled_date [name: 'idx_appointments_scheduled_date']
+  }
+
+  Note: 'Trabajos agendados (cuando proposal es aceptada). Trackea reprogramaciones, cancelaciones.'
+}
+
+// ============================================
+// TABLA: chats
+// ============================================
+Table chats {
+  id integer [pk, increment]
+  client_id integer [not null, ref: > users.id]
+  professional_id integer [not null, ref: > users.id]
+  last_message_at timestamp [null, note: 'Timestamp último mensaje (para ordenar lista)']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    client_id [name: 'idx_chats_client_id']
+    professional_id [name: 'idx_chats_professional_id']
+    last_message_at [name: 'idx_chats_last_message_at', type: btree]
+    (client_id, professional_id) [unique, name: 'idx_chats_unique_pair', note: 'Solo 1 chat por par']
+  }
+
+  Note: 'Conversaciones 1-to-1 entre cliente y profesional.'
+}
+
+// ============================================
+// TABLA: messages
+// ============================================
+Table messages {
+  id integer [pk, increment]
+  chat_id integer [not null, ref: > chats.id]
+  sender_id integer [not null, ref: > users.id]
+  message_text text [null, note: 'Texto mensaje (max 2000 chars)']
+  media_url varchar(500) [null, note: 'URL imagen/video (opcional)']
+  read boolean [default: false, note: 'TRUE si destinatario leyó']
+  read_at timestamp [null, note: 'Timestamp lectura']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    chat_id [name: 'idx_messages_chat_id']
+    sender_id [name: 'idx_messages_sender_id']
+    created_at [name: 'idx_messages_created_at', type: btree]
+    read [name: 'idx_messages_read', type: btree, note: 'Partial index WHERE read = FALSE']
+  }
+
+  Note: 'Mensajes individuales en chat. Soporta texto + media (imágenes/videos).'
+}
+
+// ============================================
+// TABLA: payments
+// ============================================
+Table payments {
+  id integer [pk, increment]
+  proposal_id integer [null, ref: > proposals.id, note: 'Propuesta asociada (si viene de post)']
+  appointment_id integer [null, ref: > appointments.id, note: 'Trabajo asociado']
+  client_id integer [not null, ref: > users.id]
+  professional_id integer [not null, ref: > users.id]
+  amount decimal(10,2) [not null, note: 'Monto total trabajo (bruto) en ARS']
+  commission_percentage decimal(5,2) [not null, note: '% comisión (0 / 10 / 50)']
+  commission_amount decimal(10,2) [not null, note: 'Monto comisión en ARS']
+  net_amount decimal(10,2) [not null, note: 'Monto neto profesional (amount - commission - penalty)']
+  penalty_amount decimal(10,2) [default: 0, note: 'Penalización cancelación (15% amount)']
+  penalty_reason varchar(100) [null, note: 'cancelled_by_client / cancelled_by_professional']
+  payment_method varchar(20) [not null, note: 'mercadopago / cash']
+  mercadopago_payment_id varchar(100) [null, note: 'ID transacción MP (tracking/webhooks)']
+  currency varchar(3) [default: 'ARS', note: 'Moneda (preparado expansión)']
+  status varchar(20) [not null, default: 'pending', note: 'pending / completed / refunded / failed']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    proposal_id [name: 'idx_payments_proposal_id']
+    appointment_id [name: 'idx_payments_appointment_id']
+    client_id [name: 'idx_payments_client_id']
+    professional_id [name: 'idx_payments_professional_id']
+    status [name: 'idx_payments_status']
+    mercadopago_payment_id [name: 'idx_payments_mp_payment_id']
+  }
+
+  Note: 'Transacciones de pago. Se crea cuando cliente acepta propuesta y paga.'
+}
+
+// ============================================
+// TABLA: reviews
+// ============================================
+Table reviews {
+  id integer [pk, increment]
+  appointment_id integer [not null, ref: > appointments.id, note: 'Trabajo calificado']
+  reviewer_id integer [not null, ref: > users.id, note: 'Quien califica']
+  reviewed_id integer [not null, ref: > users.id, note: 'Quien recibe calificación']
+  rating integer [not null, note: '1-5 estrellas (CHECK rating BETWEEN 1 AND 5)']
+  comment text [null, note: 'Comentario (max 500 chars, opcional)']
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    appointment_id [name: 'idx_reviews_appointment_id']
+    reviewer_id [name: 'idx_reviews_reviewer_id']
+    reviewed_id [name: 'idx_reviews_reviewed_id']
+    (appointment_id, reviewer_id) [unique, name: 'idx_reviews_unique_per_user', note: '1 review por appointment por user']
+  }
+
+  Note: 'Calificaciones bidireccionales. Se crea después de completar appointment + payment.'
+}
+
+// ============================================
+// TABLA: balances
+// ============================================
+Table balances {
+  id integer [pk, increment]
+  professional_id integer [unique, not null, ref: - professionals.id, note: 'Relación 1-to-1 con profesional']
+  balance decimal(10,2) [not null, default: 0, note: 'Balance actual (negativo = deuda)']
+  last_settlement_date timestamp [null, note: 'Última fecha cobro exitoso']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    professional_id [name: 'idx_balances_professional_id']
+    balance [name: 'idx_balances_balance', note: 'Partial index WHERE balance < 0']
+  }
+
+  Note: 'Tracking deuda profesionales (cuando pago es en efectivo). Cobro automático fin de mes.'
+}
+
+// ============================================
+// TABLA: bonuses (FASE 2)
+// ============================================
+Table bonuses {
+  id integer [pk, increment]
+  professional_id integer [not null, ref: > professionals.id]
+  jobs_completed_count integer [not null, note: 'Cantidad trabajos completados (ej: 20, 40, 60)']
+  bonus_amount decimal(10,2) [not null, note: 'Monto bono calculado (25% total 20 trabajos)']
+  status varchar(20) [not null, default: 'pending', note: 'pending / paid']
+  created_at timestamp [default: `now()`]
+  paid_at timestamp [null, note: 'Fecha pago bono']
+
+  indexes {
+    professional_id [name: 'idx_bonuses_professional_id']
+    status [name: 'idx_bonuses_status']
+  }
+
+  Note: 'Bonos fidelización profesionales (FASE 2). Cada 20 trabajos = 25% total.'
+}
+
+// ============================================
+// TABLA: notifications
+// ============================================
+Table notifications {
+  id integer [pk, increment]
+  user_id integer [not null, ref: > users.id]
+  type varchar(50) [not null, note: 'Tipo notificación (new_proposal, message, etc.)']
+  title varchar(100) [not null, note: 'Título push']
+  body text [not null, note: 'Cuerpo mensaje']
+  data jsonb [null, note: 'Payload adicional (deep link info, JSON)']
+  read boolean [default: false, note: 'TRUE si usuario abrió notificación']
+  sent_at timestamp [default: `now()`]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_notifications_user_id']
+    type [name: 'idx_notifications_type']
+    read [name: 'idx_notifications_read', note: 'Partial index WHERE read = FALSE']
+    sent_at [name: 'idx_notifications_sent_at', type: btree]
+  }
+
+  Note: 'Log notificaciones push enviadas. Útil para debugging, analytics, re-envío fallidos.'
+}
+
+// ============================================
+// RELACIONES VISUALES (Redundantes con ref: pero útiles para diagrama)
+// ============================================
+
+// One-to-One
+Ref: professionals.user_id - users.id
+Ref: appointments.proposal_id - proposals.id
+Ref: balances.professional_id - professionals.id
+
+// One-to-Many
+Ref: posts.user_id > users.id
+Ref: proposals.post_id > posts.id
+Ref: proposals.professional_id > professionals.id
+Ref: post_media.post_id > posts.id
+Ref: certifications.professional_id > professionals.id
+Ref: chats.client_id > users.id
+Ref: chats.professional_id > users.id
+Ref: messages.chat_id > chats.id
+Ref: messages.sender_id > users.id
+Ref: payments.proposal_id > proposals.id
+Ref: payments.appointment_id > appointments.id
+Ref: payments.client_id > users.id
+Ref: payments.professional_id > users.id
+Ref: reviews.appointment_id > appointments.id
+Ref: reviews.reviewer_id > users.id
+Ref: reviews.reviewed_id > users.id
+Ref: bonuses.professional_id > professionals.id
+Ref: notifications.user_id > users.id
+Ref: certifications.reviewed_by > users.id
+
+// Many-to-Many (via pivot tables)
+Ref: professional_categories.professional_id > professionals.id
+Ref: professional_categories.category_id > categories.id
+Ref: post_categories.post_id > posts.id
+Ref: post_categories.category_id > categories.id
