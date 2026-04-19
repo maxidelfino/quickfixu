@@ -23,3 +23,26 @@ export const createProposalSchema = z.object({
   proposedTime: z.string().datetime().optional(),
   expiresAt: z.string().datetime(),
 });
+
+const appointmentCoordinationFields = {
+  location: z.string().min(3).max(500).optional(),
+  instructions: z.string().min(3).max(2000).optional(),
+  notes: z.string().min(3).max(2000).optional(),
+};
+
+export const scheduleAppointmentSchema = z.object({
+  scheduledDate: z.string().date(),
+  scheduledTime: z.string().datetime(),
+  ...appointmentCoordinationFields,
+});
+
+export const updateAppointmentSchema = scheduleAppointmentSchema;
+
+export const cancelAppointmentSchema = z.object({
+  reason: z.string().min(10).max(1000),
+});
+
+export const createReviewSchema = z.object({
+  rating: z.coerce.number().int().min(1).max(5),
+  comment: z.string().min(10).max(1000).optional(),
+});

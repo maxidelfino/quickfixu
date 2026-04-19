@@ -1,4 +1,12 @@
-import { resolveAppointmentCompletionState } from '../domain/marketplace';
+import {
+  AppointmentCancellationActor,
+  calculateNextRatingSummary,
+  resolveAppointmentCancellationState,
+  resolveAppointmentCompletionState,
+  resolveAppointmentSchedulingState,
+  resolveAppointmentStartState,
+  resolveReviewEligibility,
+} from '../domain/marketplace';
 import { AppError } from '../types/errors.types';
 import { marketplaceRepository } from '../repositories/marketplace.repository';
 
@@ -24,6 +32,23 @@ interface CreateProposalDto {
   proposedDate?: string;
   proposedTime?: string;
   expiresAt: string;
+}
+
+interface AppointmentScheduleDto {
+  scheduledDate: string;
+  scheduledTime: string;
+  location?: string;
+  instructions?: string;
+  notes?: string;
+}
+
+interface CancelAppointmentDto {
+  reason: string;
+}
+
+interface CreateReviewDto {
+  rating: number;
+  comment?: string;
 }
 
 const REQUEST_OPEN_STATUSES = new Set(['published', 'receiving_proposals']);
@@ -78,7 +103,12 @@ function mapAppointment(appointment: any) {
     status: appointment.status,
     scheduledDate: appointment.scheduledDate,
     scheduledTime: appointment.scheduledTime,
+    location: appointment.location ?? null,
+    instructions: appointment.instructions ?? null,
+    notes: appointment.notes ?? null,
     rescheduledCount: appointment.rescheduledCount,
+    cancellationReason: appointment.cancellationReason,
+    cancelledBy: appointment.cancelledBy,
     clientConfirmedCompletionAt: appointment.clientConfirmedCompletionAt,
     professionalConfirmedCompletionAt: appointment.professionalConfirmedCompletionAt,
     completedAt: appointment.completedAt,
@@ -86,6 +116,76 @@ function mapAppointment(appointment: any) {
     updatedAt: appointment.updatedAt,
     request: appointment.request,
     proposal: appointment.proposal,
+    requestSummary: appointment.request
+      ? {
+          id: appointment.request.id,
+          title: appointment.request.title,
+          status: appointment.request.status,
+          expiresAt: appointment.request.expiresAt ?? null,
+          client: appointment.request.user
+            ? {
+                id: appointment.request.user.id,
+                fullName: appointment.request.user.fullName,
+              }
+            : null,
+        }
+      : null,
+    proposalSummary: appointment.proposal
+      ? {
+          id: appointment.proposal.id,
+          status: appointment.proposal.status,
+          priceReference: toNumber(appointment.proposal.priceReference),
+          scopeNotes: appointment.proposal.scopeNotes,
+          proposedDate: appointment.proposal.proposedDate ?? null,
+          proposedTime: appointment.proposal.proposedTime ?? null,
+          professional: appointment.proposal.professional
+            ? {
+                id: appointment.proposal.professional.id,
+                fullName: appointment.proposal.professional.user?.fullName ?? null,
+                rating: appointment.proposal.professional.user?.rating != null
+                  ? toNumber(appointment.proposal.professional.user.rating)
+                  : null,
+                ratingCount: appointment.proposal.professional.user?.ratingCount ?? null,
+              }
+            : null,
+        }
+      : null,
+  };
+}
+
+function mapReview(review: any) {
+  return {
+    id: review.id,
+    appointmentId: review.appointmentId,
+    reviewerUserId: review.reviewerUserId,
+    reviewedUserId: review.reviewedUserId,
+    rating: review.rating,
+    comment: review.comment,
+    createdAt: review.createdAt,
+    reviewer: review.reviewer,
+    reviewed: review.reviewed,
+  };
+}
+
+function appointmentParticipantRole(appointment: any, actor: AuthenticatedActor): AppointmentCancellationActor {
+  if (appointment.request.userId === actor.id) {
+    return 'client';
+  }
+
+  if (appointment.proposal.professional.user.id === actor.id) {
+    return 'professional';
+  }
+
+  throw new AppError(403, 'You are not part of this appointment');
+}
+
+function parseAppointmentSchedule(input: AppointmentScheduleDto) {
+  return {
+    scheduledDate: new Date(input.scheduledDate),
+    scheduledTime: new Date(input.scheduledTime),
+    location: input.location ?? null,
+    instructions: input.instructions ?? null,
+    notes: input.notes ?? null,
   };
 }
 
@@ -240,6 +340,18 @@ class MarketplaceService {
     return mapAppointment(appointment);
   }
 
+  async getAppointmentById(actor: AuthenticatedActor, appointmentId: number) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    appointmentParticipantRole(appointment, actor);
+
+    return mapAppointment(appointment);
+  }
+
   async confirmAppointmentCompletion(actor: AuthenticatedActor, appointmentId: number) {
     const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
 
@@ -249,6 +361,10 @@ class MarketplaceService {
 
     if (appointment.status === 'cancelled') {
       throw new AppError(409, 'Cancelled appointments cannot be completed');
+    }
+
+    if (!['in_progress', 'pending_completion_confirmation'].includes(appointment.status)) {
+      throw new AppError(409, 'Appointment must be in progress before completion confirmation');
     }
 
     const now = new Date();
@@ -281,6 +397,177 @@ class MarketplaceService {
     );
 
     return mapAppointment(updatedAppointment);
+  }
+
+  async scheduleAppointment(actor: AuthenticatedActor, appointmentId: number, input: AppointmentScheduleDto) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    appointmentParticipantRole(appointment, actor);
+
+    const transition = resolveAppointmentSchedulingState({
+      currentStatus: appointment.status,
+      rescheduledCount: appointment.rescheduledCount,
+      mode: 'initial',
+    });
+    const schedule = parseAppointmentSchedule(input);
+
+    const updatedAppointment = await marketplaceRepository.updateAppointmentLifecycle(
+      appointmentId,
+      {
+        scheduledDate: schedule.scheduledDate,
+        scheduledTime: schedule.scheduledTime,
+        location: schedule.location,
+        instructions: schedule.instructions,
+        notes: schedule.notes,
+        status: transition.status,
+        rescheduledCount: transition.rescheduledCount,
+      },
+      appointment.requestId,
+      'in_coordination'
+    );
+
+    return mapAppointment(updatedAppointment);
+  }
+
+  async updateAppointment(actor: AuthenticatedActor, appointmentId: number, input: AppointmentScheduleDto) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    appointmentParticipantRole(appointment, actor);
+
+    const transition = resolveAppointmentSchedulingState({
+      currentStatus: appointment.status,
+      rescheduledCount: appointment.rescheduledCount,
+      mode: 'update',
+    });
+    const schedule = parseAppointmentSchedule(input);
+
+    const updatedAppointment = await marketplaceRepository.updateAppointmentLifecycle(
+      appointmentId,
+      {
+        scheduledDate: schedule.scheduledDate,
+        scheduledTime: schedule.scheduledTime,
+        location: schedule.location,
+        instructions: schedule.instructions,
+        notes: schedule.notes,
+        status: transition.status,
+        rescheduledCount: transition.rescheduledCount,
+      },
+      appointment.requestId,
+      'in_coordination'
+    );
+
+    return mapAppointment(updatedAppointment);
+  }
+
+  async startAppointment(actor: AuthenticatedActor, appointmentId: number) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    appointmentParticipantRole(appointment, actor);
+
+    const transition = resolveAppointmentStartState(appointment.status);
+
+    const updatedAppointment = await marketplaceRepository.updateAppointmentLifecycle(
+      appointmentId,
+      { status: transition.status },
+      appointment.requestId,
+      'in_coordination'
+    );
+
+    return mapAppointment(updatedAppointment);
+  }
+
+  async cancelAppointment(actor: AuthenticatedActor, appointmentId: number, input: CancelAppointmentDto) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    const cancelledBy = appointmentParticipantRole(appointment, actor);
+    const transition = resolveAppointmentCancellationState(appointment.status);
+
+    const updatedAppointment = await marketplaceRepository.updateAppointmentLifecycle(
+      appointmentId,
+      {
+        status: transition.appointmentStatus,
+        cancellationReason: input.reason,
+        cancelledBy,
+      },
+      appointment.requestId,
+      transition.requestStatus
+    );
+
+    return mapAppointment(updatedAppointment);
+  }
+
+  async createAppointmentReview(actor: AuthenticatedActor, appointmentId: number, input: CreateReviewDto) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    const eligibility = resolveReviewEligibility({
+      appointmentStatus: appointment.status,
+      completedAt: appointment.completedAt,
+    });
+
+    if (!eligibility.eligible) {
+      throw new AppError(409, eligibility.reason!);
+    }
+
+    const participantRole = appointmentParticipantRole(appointment, actor);
+    const reviewedUser = participantRole === 'client'
+      ? appointment.proposal.professional.user
+      : appointment.request.user;
+
+    const existingReview = await marketplaceRepository.getReviewByAppointmentAndReviewer(appointmentId, actor.id);
+    if (existingReview) {
+      throw new AppError(409, 'You have already reviewed this appointment');
+    }
+
+    const ratingSummary = calculateNextRatingSummary({
+      currentRating: toNumber(reviewedUser.rating),
+      currentRatingCount: reviewedUser.ratingCount,
+      newRating: input.rating,
+    });
+
+    const review = await marketplaceRepository.createReview({
+      appointmentId,
+      reviewerUserId: actor.id,
+      reviewedUserId: reviewedUser.id,
+      rating: input.rating,
+      comment: input.comment ?? null,
+      reviewedRating: ratingSummary.rating,
+      reviewedRatingCount: ratingSummary.ratingCount,
+    });
+
+    return mapReview(review);
+  }
+
+  async listAppointmentReviews(actor: AuthenticatedActor, appointmentId: number) {
+    const appointment = await marketplaceRepository.getAppointmentById(appointmentId);
+
+    if (!appointment) {
+      throw new AppError(404, 'Appointment not found');
+    }
+
+    appointmentParticipantRole(appointment, actor);
+
+    const reviews = await marketplaceRepository.listAppointmentReviews(appointmentId);
+    return reviews.map(mapReview);
   }
 }
 

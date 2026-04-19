@@ -4,7 +4,12 @@ import {
   PROPOSAL_STATUSES,
   REQUEST_MEDIA_TYPES,
   REQUEST_STATUSES,
+  calculateNextRatingSummary,
+  resolveAppointmentCancellationState,
   resolveAppointmentCompletionState,
+  resolveAppointmentSchedulingState,
+  resolveAppointmentStartState,
+  resolveReviewEligibility,
 } from '../../../src/domain/marketplace';
 
 describe('marketplace domain foundation', () => {
@@ -67,6 +72,95 @@ describe('marketplace domain foundation', () => {
     ).toEqual({
       status: 'completed',
       completedAt: professionalConfirmedAt,
+    });
+  });
+
+  it('moves coordinating appointments to scheduled on the first agreed date and time', () => {
+    expect(
+      resolveAppointmentSchedulingState({
+        currentStatus: 'coordinating',
+        rescheduledCount: 0,
+        mode: 'initial',
+      })
+    ).toEqual({
+      status: 'scheduled',
+      rescheduledCount: 0,
+    });
+  });
+
+  it('increments rescheduled count when a scheduled appointment is updated', () => {
+    expect(
+      resolveAppointmentSchedulingState({
+        currentStatus: 'scheduled',
+        rescheduledCount: 1,
+        mode: 'update',
+      })
+    ).toEqual({
+      status: 'scheduled',
+      rescheduledCount: 2,
+    });
+  });
+
+  it('allows appointments to start only after they are scheduled', () => {
+    expect(resolveAppointmentStartState('scheduled')).toEqual({
+      status: 'in_progress',
+    });
+  });
+
+  it('closes the linked request when an appointment is cancelled', () => {
+    expect(resolveAppointmentCancellationState('scheduled')).toEqual({
+      appointmentStatus: 'cancelled',
+      requestStatus: 'closed',
+    });
+  });
+
+  it('allows reviews only after an appointment reaches confirmed completion', () => {
+    expect(
+      resolveReviewEligibility({
+        appointmentStatus: 'completed',
+        completedAt: new Date('2026-04-18T16:00:00.000Z'),
+      })
+    ).toEqual({
+      eligible: true,
+      reason: null,
+    });
+  });
+
+  it('keeps reviews blocked before confirmed completion', () => {
+    expect(
+      resolveReviewEligibility({
+        appointmentStatus: 'pending_completion_confirmation',
+        completedAt: null,
+      })
+    ).toEqual({
+      eligible: false,
+      reason: 'Appointment must be completed before reviews can be created',
+    });
+  });
+
+  it('starts a reviewed user rating summary from the first review', () => {
+    expect(
+      calculateNextRatingSummary({
+        currentRating: 0,
+        currentRatingCount: 0,
+        newRating: 5,
+      })
+    ).toEqual({
+      rating: 5,
+      ratingCount: 1,
+    });
+  });
+
+  it('recalculates a reviewed user rating summary with two-decimal precision', () => {
+    expect(
+      calculateNextRatingSummary({
+        currentRating: 4.5,
+        currentRatingCount: 2,
+        newRating: 5,
+      })
+    ).toEqual({
+      rating: 4.67,
+      ratingCount: 3,
     });
   });
 });

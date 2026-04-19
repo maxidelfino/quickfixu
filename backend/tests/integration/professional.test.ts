@@ -304,3 +304,148 @@ describe('DELETE /api/professionals/me/certifications/:id', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ============================================================
+// GET /api/professionals/:id/reviews
+// ============================================================
+
+describe('GET /api/professionals/:id/reviews', () => {
+  const mockProfessionalUser = {
+    id: 1,
+    fullName: 'Juan Pérez',
+    email: 'juan@example.com',
+    phone: '+54 9 11 1234-5678',
+    address: 'Av. Corrientes 1234',
+    profilePhotoUrl: null,
+    rating: 4.5,
+    ratingCount: 10,
+    isActive: true,
+    createdAt: new Date(),
+    professional: {
+      id: 10,
+      userId: 1,
+      yearsExperience: 5,
+      description: 'Plomero con experiencia',
+      categories: [],
+      certifications: [],
+    },
+  };
+
+  const mockReviewer = {
+    id: 2,
+    fullName: 'María García',
+    profilePhotoUrl: 'https://example.com/photo.jpg',
+  };
+
+  const mockCompletedAppointment = {
+    id: 100,
+    status: 'completed',
+    completedAt: new Date('2024-01-15'),
+  };
+
+  const mockReview = {
+    id: 1,
+    appointmentId: 100,
+    reviewerUserId: 2,
+    reviewedUserId: 1,
+    rating: 5,
+    comment: 'Excelente trabajo',
+    createdAt: new Date('2024-01-16'),
+    reviewer: mockReviewer,
+    appointment: mockCompletedAppointment,
+  };
+
+  it('should return 200 with reviews for a professional', async () => {
+    mockPrisma.professional.findUnique.mockResolvedValue({
+      ...mockProfessionalUser.professional,
+      user: {
+        id: 1,
+        fullName: 'Juan Pérez',
+        profilePhotoUrl: null,
+        rating: 4.5,
+        ratingCount: 10,
+      },
+      categories: [],
+      certifications: [],
+    });
+    mockPrisma.review.findMany.mockResolvedValue([mockReview]);
+
+    const res = await request(app).get('/api/professionals/10/reviews');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('professionalId', 10);
+    expect(res.body).toHaveProperty('reviews');
+    expect(res.body).toHaveProperty('total');
+    expect(res.body.reviews).toHaveLength(1);
+    expect(res.body.reviews[0]).toMatchObject({
+      id: 1,
+      rating: 5,
+      comment: 'Excelente trabajo',
+      reviewerFullName: 'María García',
+    });
+  });
+
+  it('should return 200 with empty reviews array when professional has no reviews', async () => {
+    mockPrisma.professional.findUnique.mockResolvedValue({
+      ...mockProfessionalUser.professional,
+      user: {
+        id: 1,
+        fullName: 'Juan Pérez',
+        profilePhotoUrl: null,
+        rating: 4.5,
+        ratingCount: 10,
+      },
+      categories: [],
+      certifications: [],
+    });
+    mockPrisma.review.findMany.mockResolvedValue([]);
+
+    const res = await request(app).get('/api/professionals/10/reviews');
+
+    expect(res.status).toBe(200);
+    expect(res.body.professionalId).toBe(10);
+    expect(res.body.reviews).toHaveLength(0);
+    expect(res.body.total).toBe(0);
+  });
+
+  it('should return 404 when professional not found', async () => {
+    mockPrisma.professional.findUnique.mockResolvedValue(null);
+
+    const res = await request(app).get('/api/professionals/999/reviews');
+
+    expect(res.status).toBe(404);
+  });
+
+  it('should return 401 for non-numeric professional ID (route regex [0-9]+ does not match, then hits auth middleware)', async () => {
+    // The route is defined as router.get('/:id([0-9]+)/reviews', ...)
+    // Since 'invalid' contains non-digit characters, it fails the [0-9]+ regex.
+    // The route does not match, so Express proceeds to the auth middleware (which is mounted via router.use()).
+    // Since no auth token is provided, middleware returns 401.
+    // This is the current Express behavior; the malformed ID is rejected before reaching the controller.
+    // Contract: malformed ID → 401 (not 400, not 404) in current Express routing.
+    const res = await request(app).get('/api/professionals/invalid/reviews');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('should not require authentication (public endpoint)', async () => {
+    mockPrisma.professional.findUnique.mockResolvedValue({
+      ...mockProfessionalUser.professional,
+      user: {
+        id: 1,
+        fullName: 'Juan Pérez',
+        profilePhotoUrl: null,
+        rating: 4.5,
+        ratingCount: 10,
+      },
+      categories: [],
+      certifications: [],
+    });
+    mockPrisma.review.findMany.mockResolvedValue([mockReview]);
+
+    // No Authorization header set
+    const res = await request(app).get('/api/professionals/10/reviews');
+
+    expect(res.status).toBe(200);
+  });
+});

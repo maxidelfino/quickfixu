@@ -81,6 +81,9 @@ const coordinatingAppointment = {
   status: 'coordinating',
   scheduledDate: new Date('2026-04-24T00:00:00.000Z'),
   scheduledTime: new Date('2026-04-24T15:30:00.000Z'),
+  location: 'Calle Falsa 123, CABA',
+  instructions: 'Ring the bell twice and ask for Marta.',
+  notes: 'Client reports intermittent outage after using the oven.',
   rescheduledCount: 0,
   clientConfirmedCompletionAt: null,
   professionalConfirmedCompletionAt: null,
@@ -90,19 +93,53 @@ const coordinatingAppointment = {
   request: {
     id: 101,
     userId: 1,
+    user: { id: 1, fullName: 'Client User', rating: 4.2, ratingCount: 3 },
     title: 'Electricity outage in kitchen',
     status: 'in_coordination',
   },
   proposal: {
     id: 201,
     professionalId: 20,
+    status: 'sent',
     priceReference: 25000,
     scopeNotes: 'Includes diagnostics, replacement recommendation, and labor estimate.',
+    proposedDate: new Date('2026-04-24T00:00:00.000Z'),
+    proposedTime: new Date('2026-04-24T15:30:00.000Z'),
     professional: {
       id: 20,
-      user: { id: 2, fullName: 'Professional User' },
+      user: { id: 2, fullName: 'Professional User', rating: 4.8, ratingCount: 12 },
     },
   },
+};
+
+const scheduledAppointment = {
+  ...coordinatingAppointment,
+  status: 'scheduled',
+};
+
+const inProgressAppointment = {
+  ...scheduledAppointment,
+  status: 'in_progress',
+};
+
+const completedAppointment = {
+  ...inProgressAppointment,
+  status: 'completed',
+  clientConfirmedCompletionAt: new Date('2026-04-18T13:00:00.000Z'),
+  professionalConfirmedCompletionAt: new Date('2026-04-18T13:30:00.000Z'),
+  completedAt: new Date('2026-04-18T13:30:00.000Z'),
+};
+
+const reviewRecord = {
+  id: 401,
+  appointmentId: 301,
+  reviewerUserId: 1,
+  reviewedUserId: 2,
+  rating: 5,
+  comment: 'Excellent communication and fast resolution.',
+  createdAt: new Date('2026-04-18T14:00:00.000Z'),
+  reviewer: { id: 1, fullName: 'Client User' },
+  reviewed: { id: 2, fullName: 'Professional User', rating: 4.82, ratingCount: 13 },
 };
 
 describe('Marketplace API', () => {
@@ -126,6 +163,10 @@ describe('Marketplace API', () => {
       ...coordinatingAppointment,
       ...data,
     }));
+    mockPrisma.review.findFirst.mockResolvedValue(null);
+    mockPrisma.review.findMany.mockResolvedValue([reviewRecord]);
+    mockPrisma.review.create.mockResolvedValue(reviewRecord);
+    mockPrisma.user.update.mockResolvedValue({ id: 2, rating: 4.82, ratingCount: 13 });
   });
 
   describe('POST /api/requests', () => {
@@ -315,9 +356,21 @@ describe('Marketplace API', () => {
   });
 
   describe('POST /api/appointments/:id/confirm-completion', () => {
+    it('should reject confirming completion before the appointment starts', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(scheduledAppointment);
+
+      const res = await request(app)
+        .post('/api/appointments/301/confirm-completion')
+        .set('Authorization', bearerToken(1));
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('Appointment must be in progress before completion confirmation');
+    });
+
     it('should move appointment to pending completion after first confirmation', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
-      mockPrisma.appointment.findUnique.mockResolvedValue(coordinatingAppointment);
+      mockPrisma.appointment.findUnique.mockResolvedValue(inProgressAppointment);
 
       const res = await request(app)
         .post('/api/appointments/301/confirm-completion')
@@ -335,7 +388,7 @@ describe('Marketplace API', () => {
     it('should complete appointment after bilateral confirmation', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(professionalAuthUser);
       mockPrisma.appointment.findUnique.mockResolvedValue({
-        ...coordinatingAppointment,
+        ...inProgressAppointment,
         status: 'pending_completion_confirmation',
         clientConfirmedCompletionAt: new Date('2026-04-18T13:00:00.000Z'),
       });
@@ -351,6 +404,239 @@ describe('Marketplace API', () => {
       });
       expect(res.body.professionalConfirmedCompletionAt).toBeTruthy();
       expect(res.body.completedAt).toBeTruthy();
+    });
+  });
+
+  describe('GET /api/appointments/:id', () => {
+    it('should return appointment detail with coordination fields and linked summaries for a participant', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(coordinatingAppointment);
+
+      const res = await request(app)
+        .get('/api/appointments/301')
+        .set('Authorization', bearerToken(1));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: 301,
+        status: 'coordinating',
+        location: 'Calle Falsa 123, CABA',
+        instructions: 'Ring the bell twice and ask for Marta.',
+        notes: 'Client reports intermittent outage after using the oven.',
+        requestSummary: {
+          id: 101,
+          title: 'Electricity outage in kitchen',
+          status: 'in_coordination',
+          client: {
+            id: 1,
+            fullName: 'Client User',
+          },
+        },
+        proposalSummary: {
+          id: 201,
+          status: 'sent',
+          priceReference: 25000,
+          scopeNotes: 'Includes diagnostics, replacement recommendation, and labor estimate.',
+          professional: {
+            id: 20,
+            fullName: 'Professional User',
+          },
+        },
+      });
+    });
+
+    it('should reject appointment detail access for non-participants', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 99,
+        email: 'outsider@example.com',
+        isActive: true,
+        professional: null,
+      });
+      mockPrisma.appointment.findUnique.mockResolvedValue(coordinatingAppointment);
+
+      const res = await request(app)
+        .get('/api/appointments/301')
+        .set('Authorization', bearerToken(99));
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('You are not part of this appointment');
+    });
+  });
+
+  describe('POST /api/appointments/:id/reviews', () => {
+    it('should reject review creation before confirmed completion', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(inProgressAppointment);
+
+      const res = await request(app)
+        .post('/api/appointments/301/reviews')
+        .set('Authorization', bearerToken(1))
+        .send({
+          rating: 5,
+          comment: 'Excellent communication and fast resolution.',
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('Appointment must be completed before reviews can be created');
+    });
+
+    it('should create a review after confirmed completion and update the reviewed rating summary', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(completedAppointment);
+
+      const res = await request(app)
+        .post('/api/appointments/301/reviews')
+        .set('Authorization', bearerToken(1))
+        .send({
+          rating: 5,
+          comment: 'Excellent communication and fast resolution.',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({
+        appointmentId: 301,
+        reviewerUserId: 1,
+        reviewedUserId: 2,
+        rating: 5,
+      });
+      expect(res.body.reviewed).toMatchObject({
+        id: 2,
+        rating: 4.82,
+        ratingCount: 13,
+      });
+    });
+
+    it('should reject duplicate reviews from the same participant for the same appointment', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(completedAppointment);
+      mockPrisma.review.findFirst.mockResolvedValue(reviewRecord);
+
+      const res = await request(app)
+        .post('/api/appointments/301/reviews')
+        .set('Authorization', bearerToken(1))
+        .send({
+          rating: 5,
+          comment: 'Excellent communication and fast resolution.',
+        });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe('You have already reviewed this appointment');
+    });
+  });
+
+  describe('GET /api/appointments/:id/reviews', () => {
+    it('should list appointment reviews for a participant after completion', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(professionalAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(completedAppointment);
+
+      const res = await request(app)
+        .get('/api/appointments/301/reviews')
+        .set('Authorization', bearerToken(2));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('count', 1);
+      expect(res.body.reviews[0]).toMatchObject({
+        id: 401,
+        appointmentId: 301,
+        rating: 5,
+        reviewerUserId: 1,
+        reviewedUserId: 2,
+      });
+    });
+  });
+
+  describe('POST /api/appointments/:id/schedule', () => {
+    it('should schedule a coordinating appointment on the first agreed date and time with coordination details', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(coordinatingAppointment);
+
+      const res = await request(app)
+        .post('/api/appointments/301/schedule')
+        .set('Authorization', bearerToken(1))
+        .send({
+          scheduledDate: '2026-04-25',
+          scheduledTime: '2026-04-25T17:00:00.000Z',
+          location: 'Av. Corrientes 456, Piso 8',
+          instructions: 'Call before arriving because the intercom is broken.',
+          notes: 'Bring voltage tester and replacement breaker options.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: 301,
+        status: 'scheduled',
+        rescheduledCount: 0,
+        location: 'Av. Corrientes 456, Piso 8',
+        instructions: 'Call before arriving because the intercom is broken.',
+        notes: 'Bring voltage tester and replacement breaker options.',
+      });
+    });
+  });
+
+  describe('PATCH /api/appointments/:id', () => {
+    it('should update a scheduled appointment, replace coordination details, and increment rescheduled count', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(professionalAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(scheduledAppointment);
+
+      const res = await request(app)
+        .patch('/api/appointments/301')
+        .set('Authorization', bearerToken(2))
+        .send({
+          scheduledDate: '2026-04-26',
+          scheduledTime: '2026-04-26T18:15:00.000Z',
+          location: 'Pasaje Thames 789, Timbre B',
+          instructions: 'The client will share parking access by chat.',
+          notes: 'Need ladder because the panel is on the terrace.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: 301,
+        status: 'scheduled',
+        rescheduledCount: 1,
+        location: 'Pasaje Thames 789, Timbre B',
+        instructions: 'The client will share parking access by chat.',
+        notes: 'Need ladder because the panel is on the terrace.',
+      });
+    });
+  });
+
+  describe('POST /api/appointments/:id/start', () => {
+    it('should move a scheduled appointment into progress', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(professionalAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(scheduledAppointment);
+
+      const res = await request(app)
+        .post('/api/appointments/301/start')
+        .set('Authorization', bearerToken(2));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: 301,
+        status: 'in_progress',
+      });
+    });
+  });
+
+  describe('POST /api/appointments/:id/cancel', () => {
+    it('should cancel an appointment and close the linked request', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(clientAuthUser);
+      mockPrisma.appointment.findUnique.mockResolvedValue(scheduledAppointment);
+
+      const res = await request(app)
+        .post('/api/appointments/301/cancel')
+        .set('Authorization', bearerToken(1))
+        .send({
+          reason: 'We could not align a workable access window for the repair.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: 301,
+        status: 'cancelled',
+        cancelledBy: 'client',
+        cancellationReason: 'We could not align a workable access window for the repair.',
+      });
     });
   });
 });

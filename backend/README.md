@@ -186,6 +186,16 @@ The backend is beyond the initial foundation stage. This repository already incl
 - Professional profile, category, certification, and search endpoints
 - Jest and Supertest coverage for core API flows
 
+### V1 backend contract note
+
+Before implementing marketplace workflow endpoints (requests, proposals, appointments, reviews), use:
+
+- `docs/backend/V1BackendContracts.md`
+
+as the backend-domain alignment reference.
+
+QuickFixU V1 uses marketplace coordination plus completion confirmation. It does **not** model platform-managed payments, escrow, payouts, refunds, wallets, or transaction commissions in backend contracts.
+
 ## 🧪 Testing
 
 ```bash

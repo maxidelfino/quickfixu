@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { professionalController } from '../controllers/professional.controller';
+import { reviewController } from '../controllers/review.controller';
 import { requireAuth, isProfessional } from '../middleware/auth.middleware';
 import { uploadCertification, handleMulterError } from '../middleware/multer.middleware';
 
@@ -20,9 +21,16 @@ const router = Router();
 router.get('/search', professionalController.searchByLocation);
 
 /**
+ * GET /api/professionals/:id([0-9]+)/reviews
+ * Get public reviews for a professional (public)
+ * Note: Must be AFTER /search but BEFORE /:id to avoid :id matching 'search'
+ */
+router.get('/:id([0-9]+)/reviews', reviewController.getReviewsByProfessional);
+
+/**
  * GET /api/professionals/:id
  * Get public professional profile by ID (public)
- * Note: Must be AFTER /search to avoid :id matching 'search'
+ * Note: Must be AFTER /:id([0-9]+)/reviews
  */
 router.get('/:id([0-9]+)', professionalController.getPublicProfile);
 

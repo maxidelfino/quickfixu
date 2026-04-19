@@ -56,6 +56,11 @@ jest.mock('../src/config/database', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    review: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+    },
     professionalCategory: {
       findMany: jest.fn(),
       createMany: jest.fn(),

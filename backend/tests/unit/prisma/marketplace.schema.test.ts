@@ -6,6 +6,14 @@ const migrationPath = path.join(
   __dirname,
   '../../../prisma/migrations/20260418183000_v1_marketplace_foundation/migration.sql'
 );
+const reviewMigrationPath = path.join(
+  __dirname,
+  '../../../prisma/migrations/20260418193000_v1_marketplace_reviews/migration.sql'
+);
+const coordinationMigrationPath = path.join(
+  __dirname,
+  '../../../prisma/migrations/20260418213000_v1_appointment_coordination_detail/migration.sql'
+);
 
 function readSchema(): string {
   return fs.readFileSync(schemaPath, 'utf8');
@@ -68,9 +76,28 @@ describe('Prisma marketplace foundation schema', () => {
     expectLine(schema, /clientConfirmedCompletionAt\s+DateTime\?/);
     expectLine(schema, /professionalConfirmedCompletionAt\s+DateTime\?/);
     expectLine(schema, /completedAt\s+DateTime\?/);
+    expectLine(schema, /location\s+String\?/);
+    expectLine(schema, /instructions\s+String\?/);
+    expectLine(schema, /notes\s+String\?/);
     expectLine(schema, /cancelledBy\s+AppointmentCancellationActor\?/);
     expectLine(schema, /proposalId\s+Int\s+@unique/);
     expect(schema).toContain('@@map("appointments")');
+  });
+
+  it('declares reviews with appointment-scoped duplicate protection and participant relations', () => {
+    const schema = readSchema();
+
+    expect(schema).toContain('model Review {');
+    expectLine(schema, /appointmentId\s+Int/);
+    expectLine(schema, /reviewerUserId\s+Int/);
+    expectLine(schema, /reviewedUserId\s+Int/);
+    expectLine(schema, /rating\s+Int/);
+    expectLine(schema, /comment\s+String\?/);
+    expectLine(schema, /appointment\s+Appointment/);
+    expectLine(schema, /reviewer\s+User/);
+    expectLine(schema, /reviewed\s+User/);
+    expect(schema).toContain('@@unique([appointmentId, reviewerUserId])');
+    expect(schema).toContain('@@map("reviews")');
   });
 
   it('ships a SQL migration for the first marketplace foundation batch', () => {
@@ -86,6 +113,32 @@ describe('Prisma marketplace foundation schema', () => {
     expect(migration).toContain('CREATE TABLE "appointments"');
     expect(migration).toContain('price_reference');
     expect(migration).toContain('client_confirmed_completion_at');
+    expect(migration).not.toContain('payment');
+    expect(migration).not.toContain('subscription');
+  });
+
+  it('ships a SQL migration for review and trust scoring support', () => {
+    expect(fs.existsSync(reviewMigrationPath)).toBe(true);
+
+    const migration = fs.readFileSync(reviewMigrationPath, 'utf8');
+
+    expect(migration).toContain('CREATE TABLE "reviews"');
+    expect(migration).toContain('appointment_id');
+    expect(migration).toContain('reviewer_user_id');
+    expect(migration).toContain('reviewed_user_id');
+    expect(migration).toContain('CREATE UNIQUE INDEX "reviews_appointment_id_reviewer_user_id_key"');
+    expect(migration).not.toContain('payment');
+    expect(migration).not.toContain('subscription');
+  });
+
+  it('ships a SQL migration for appointment coordination detail fields', () => {
+    expect(fs.existsSync(coordinationMigrationPath)).toBe(true);
+
+    const migration = fs.readFileSync(coordinationMigrationPath, 'utf8');
+
+    expect(migration).toContain('ALTER TABLE "appointments" ADD COLUMN "location" TEXT');
+    expect(migration).toContain('ALTER TABLE "appointments" ADD COLUMN "instructions" TEXT');
+    expect(migration).toContain('ALTER TABLE "appointments" ADD COLUMN "notes" TEXT');
     expect(migration).not.toContain('payment');
     expect(migration).not.toContain('subscription');
   });

@@ -42,11 +42,15 @@ const proposalInclude = {
 
 const appointmentInclude = {
   request: {
-    select: {
-      id: true,
-      userId: true,
-      title: true,
-      status: true,
+    include: {
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          rating: true,
+          ratingCount: true,
+        },
+      },
     },
   },
   proposal: {
@@ -57,10 +61,29 @@ const appointmentInclude = {
             select: {
               id: true,
               fullName: true,
+              rating: true,
+              ratingCount: true,
             },
           },
         },
       },
+    },
+  },
+} as const;
+
+const reviewInclude = {
+  reviewer: {
+    select: {
+      id: true,
+      fullName: true,
+    },
+  },
+  reviewed: {
+    select: {
+      id: true,
+      fullName: true,
+      rating: true,
+      ratingCount: true,
     },
   },
 } as const;
@@ -84,6 +107,16 @@ interface CreateProposalInput {
   proposedDate: Date | null;
   proposedTime: Date | null;
   expiresAt: Date;
+}
+
+interface CreateReviewInput {
+  appointmentId: number;
+  reviewerUserId: number;
+  reviewedUserId: number;
+  rating: number;
+  comment: string | null;
+  reviewedRating: number;
+  reviewedRatingCount: number;
 }
 
 class MarketplaceRepository {
@@ -260,23 +293,89 @@ class MarketplaceRepository {
     });
   }
 
-  async updateAppointmentCompletion(appointmentId: number, data: Record<string, unknown>, completeRequest: boolean, requestId: number) {
+  async updateAppointmentLifecycle(
+    appointmentId: number,
+    appointmentData: Record<string, unknown>,
+    requestId?: number,
+    requestStatus?: 'in_coordination' | 'closed' | 'completed'
+  ) {
     return prisma.$transaction(async (tx: any) => {
       const appointment = await tx.appointment.update({
         where: { id: appointmentId },
-        data,
+        data: appointmentData,
         include: appointmentInclude,
       });
 
-      if (completeRequest) {
+      if (requestId && requestStatus) {
         await tx.request.update({
           where: { id: requestId },
-          data: { status: 'completed' },
+          data: { status: requestStatus },
         });
       }
 
       return appointment;
     });
+  }
+
+  async updateAppointmentCompletion(appointmentId: number, data: Record<string, unknown>, completeRequest: boolean, requestId: number) {
+    return this.updateAppointmentLifecycle(
+      appointmentId,
+      data,
+      completeRequest ? requestId : undefined,
+      completeRequest ? 'completed' : undefined
+    );
+  }
+
+  async getReviewByAppointmentAndReviewer(appointmentId: number, reviewerUserId: number) {
+    return prisma.review.findFirst({
+      where: {
+        appointmentId,
+        reviewerUserId,
+      },
+      include: reviewInclude,
+    } as any);
+  }
+
+  async createReview(input: CreateReviewInput) {
+    return prisma.$transaction(async (tx: any) => {
+      const review = await tx.review.create({
+        data: {
+          appointmentId: input.appointmentId,
+          reviewerUserId: input.reviewerUserId,
+          reviewedUserId: input.reviewedUserId,
+          rating: input.rating,
+          comment: input.comment,
+        },
+        include: reviewInclude,
+      });
+
+      const reviewed = await tx.user.update({
+        where: { id: input.reviewedUserId },
+        data: {
+          rating: input.reviewedRating,
+          ratingCount: input.reviewedRatingCount,
+        },
+        select: {
+          id: true,
+          fullName: true,
+          rating: true,
+          ratingCount: true,
+        },
+      });
+
+      return {
+        ...review,
+        reviewed,
+      };
+    });
+  }
+
+  async listAppointmentReviews(appointmentId: number) {
+    return prisma.review.findMany({
+      where: { appointmentId },
+      include: reviewInclude,
+      orderBy: { createdAt: 'desc' },
+    } as any);
   }
 }
 
