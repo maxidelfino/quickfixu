@@ -16,7 +16,7 @@ export { default as Modal } from './Modal';
 
 export type { ButtonVariant, ButtonSize } from './Button';
 export type { TextVariant, TextColor } from './Text';
-export type { IconSize } from './Icon';
+export type { IconName, IconSize } from './Icon';
 export type { AvatarSize } from './Avatar';
 export type { LoaderSize, LoaderVariant } from './Loader';
 export type { SelectOption } from './Select';

@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
+import Icon, { type IconName } from '../atoms/Icon';
 
 interface StepCardProps {
   stepNumber: number;
   title: string;
   description: string;
-  icon?: string;
+  icon?: IconName;
   style?: ViewStyle;
 }
 
@@ -22,7 +23,7 @@ const StepCard: React.FC<StepCardProps> = ({
       <View style={styles.numberContainer}>
         <Text style={styles.number}>{stepNumber}</Text>
       </View>
-      {icon && <Text style={styles.icon}>{icon}</Text>}
+      {icon ? <Icon name={icon} size="xl" color={COLORS.primary} style={styles.icon} /> : null}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
     </View>
@@ -50,7 +51,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   icon: {
-    fontSize: 28,
     marginBottom: SPACING.sm,
   },
   title: {

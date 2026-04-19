@@ -20,14 +20,14 @@ type NavigationProp = NativeStackNavigationProp<any>;
 // Professional counts are loaded from API — no mock data to avoid showing wrong numbers
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: '1', name: 'Electricidad', slug: 'electricidad', icon: '⚡' },
-  { id: '2', name: 'Plomería', slug: 'plomeria', icon: '🔧' },
-  { id: '3', name: 'Gas', slug: 'gas', icon: '🔥' },
-  { id: '4', name: 'Carpintería', slug: 'carpinteria', icon: '🪵' },
-  { id: '5', name: 'Pintura', slug: 'pintura', icon: '🎨' },
-  { id: '6', name: 'Jardinería', slug: 'jardineria', icon: '🌿' },
-  { id: '7', name: 'Limpieza', slug: 'limpieza', icon: '🧹' },
-  { id: '8', name: 'Aire Acondicionado', slug: 'aire-acondicionado', icon: '❄️' },
+  { id: '1', name: 'Electricidad', slug: 'electricidad' },
+  { id: '2', name: 'Plomería', slug: 'plomeria' },
+  { id: '3', name: 'Gas', slug: 'gas' },
+  { id: '4', name: 'Carpintería', slug: 'carpinteria' },
+  { id: '5', name: 'Pintura', slug: 'pintura' },
+  { id: '6', name: 'Jardinería', slug: 'jardineria' },
+  { id: '7', name: 'Limpieza', slug: 'limpieza' },
+  { id: '8', name: 'Aire Acondicionado', slug: 'aire-acondicionado' },
 ];
 
 const CategoryListScreen: React.FC = () => {

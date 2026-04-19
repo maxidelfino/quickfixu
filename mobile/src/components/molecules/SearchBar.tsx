@@ -3,11 +3,11 @@ import {
   View,
   TextInput,
   TouchableOpacity,
-  Text,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE } from '../../constants/config';
+import Icon from '../atoms/Icon';
 
 interface SearchBarProps {
   value: string;
@@ -27,7 +27,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <View style={[styles.container, style]}>
       <View style={styles.searchIconContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Icon name="search" size="sm" color={COLORS.gray500} />
       </View>
       
       <TextInput
@@ -49,7 +49,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <View style={styles.clearIcon}>
-            <Text style={styles.clearIconText}>✕</Text>
+            <Icon name="close" size="xs" color={COLORS.gray500} strokeWidth={2.4} />
           </View>
         </TouchableOpacity>
       )}
@@ -71,9 +71,6 @@ const styles = StyleSheet.create({
   searchIconContainer: {
     marginRight: SPACING.sm,
   },
-  searchIcon: {
-    fontSize: 18,
-  },
   input: {
     flex: 1,
     fontSize: FONT_SIZE.md,
@@ -90,10 +87,5 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gray200,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  clearIconText: {
-    fontSize: 12,
-    color: COLORS.gray500,
-    fontWeight: '600',
   },
 });

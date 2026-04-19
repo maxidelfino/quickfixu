@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MainStackParamList, MainTabParamList } from '../types';
 import { COLORS } from '../constants/config';
+import Icon, { type IconName } from '../components/atoms/Icon';
 
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -176,21 +177,30 @@ const MainNavigator: React.FC = () => {
   );
 };
 
-// Simple icon components using Unicode/Emoji
+const TabIcon = ({
+  color,
+  size,
+  name,
+}: {
+  color: string;
+  size: number;
+  name: IconName;
+}) => <Icon name={name} color={color} size={size} strokeWidth={2.2} />;
+
 const HomeIcon = ({ color, size }: { color: string; size: number }) => (
-  <React.Fragment>🏠</React.Fragment>
+  <TabIcon color={color} size={size} name="home" />
 );
 
 const SearchIcon = ({ color, size }: { color: string; size: number }) => (
-  <React.Fragment>🔍</React.Fragment>
+  <TabIcon color={color} size={size} name="search" />
 );
 
 const MessagesIcon = ({ color, size }: { color: string; size: number }) => (
-  <React.Fragment>💬</React.Fragment>
+  <TabIcon color={color} size={size} name="message" />
 );
 
 const ProfileIcon = ({ color, size }: { color: string; size: number }) => (
-  <React.Fragment>👤</React.Fragment>
+  <TabIcon color={color} size={size} name="profile" />
 );
 
 export default MainNavigator;

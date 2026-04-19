@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Category } from '../../types';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
+import { getCategoryIconName } from '../../constants/iconography';
 import Badge from '../atoms/Badge';
+import Icon from '../atoms/Icon';
 
 interface CategoryTileProps {
   category: Category;
@@ -12,18 +14,6 @@ interface CategoryTileProps {
   style?: ViewStyle;
 }
 
-const DEFAULT_ICONS: Record<string, string> = {
-  electricidad: '⚡',
-  plomeria: '🔧',
-  gas: '🔥',
-  carpinteria: '🪵',
-  pintura: '🎨',
-  jardineria: '🌿',
-  limpieza: '🧹',
-  'aire-acondicionado': '❄️',
-  default: '🔨',
-};
-
 const CategoryTile: React.FC<CategoryTileProps> = ({
   category,
   professionalCount,
@@ -31,9 +21,8 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
   variant = 'default',
   style,
 }) => {
-  const getIcon = () => {
-    if (category.icon) return category.icon;
-    return DEFAULT_ICONS[category.slug] || DEFAULT_ICONS.default;
+  const getIconName = () => {
+    return getCategoryIconName(category.slug, category.icon);
   };
 
   if (variant === 'featured') {
@@ -44,7 +33,7 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
         activeOpacity={0.8}
       >
         <View style={styles.featuredIconContainer}>
-          <Text style={styles.featuredIcon}>{getIcon()}</Text>
+          <Icon name={getIconName()} size="lg" color={COLORS.primary} />
         </View>
         <View style={styles.featuredContent}>
           <Text style={styles.featuredName}>{category.name}</Text>
@@ -68,7 +57,7 @@ const CategoryTile: React.FC<CategoryTileProps> = ({
       activeOpacity={0.7}
     >
       <View style={styles.iconContainer}>
-        <Text style={styles.icon}>{getIcon()}</Text>
+        <Icon name={getIconName()} size="xl" color={COLORS.primary} />
         {professionalCount !== undefined && professionalCount > 0 && (
           <View style={styles.badgeContainer}>
             <Badge count={professionalCount} variant="accent" />
@@ -97,9 +86,10 @@ const styles = StyleSheet.create({
   iconContainer: {
     position: 'relative',
     marginBottom: SPACING.sm,
-  },
-  icon: {
-    fontSize: 36,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeContainer: {
     position: 'absolute',
@@ -133,9 +123,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
-  },
-  featuredIcon: {
-    fontSize: 28,
   },
   featuredContent: {
     flex: 1,

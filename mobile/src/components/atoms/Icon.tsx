@@ -1,91 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { COLORS, SPACING } from '../../constants/config';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { COLORS } from '../../constants/config';
+import { ICON_COMPONENTS, isIconName, type IconName } from '../../constants/iconography';
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 interface IconProps {
-  name: string;
-  size?: IconSize;
+  name: IconName | string;
+  size?: IconSize | number;
   color?: string;
-  style?: ViewStyle;
-  provider?: 'emoji' | 'text';
+  style?: StyleProp<ViewStyle>;
+  provider?: 'lucide' | 'emoji' | 'text';
+  strokeWidth?: number;
+  fallback?: string;
 }
 
-// Predefined icon mappings using text/emoji
-// In a real app, you'd use a library like @expo/vector-icons
-const ICON_MAP: Record<string, string> = {
-  // Navigation
-  'arrow-left': '←',
-  'arrow-right': '→',
-  'arrow-back': '←',
-  'arrow-forward': '→',
-  'chevron-left': '‹',
-  'chevron-right': '›',
-  'chevron-down': '⌄',
-  'chevron-up': '⌃',
-  
-  // Actions
-  'eye': '👁',
-  'eye-off': '👁‍🗨',
-  'search': '🔍',
-  'settings': '⚙',
-  'check': '✓',
-  'close': '✕',
-  'plus': '+',
-  'minus': '−',
-  'edit': '✎',
-  'delete': '🗑',
-  'share': '↗',
-  'download': '↓',
-  
-  // Social
-  'google': 'G',
-  'facebook': 'f',
-  'apple': '',
-  'email': '✉',
-  'phone': '📞',
-  'message': '💬',
-  
-  // User
-  'user': '👤',
-  'user-plus': '👤+',
-  'users': '👥',
-  'profile': '👤',
-  
-  // Professional
-  'tool': '🔧',
-  'wrench': '🔧',
-  'hammer': '🔨',
-  'paint': '🎨',
-  'electrical': '⚡',
-  'plumbing': '🚿',
-  'cleaning': '🧹',
-  'moving': '📦',
-  
-  // Misc
-  'star': '★',
-  'star-outline': '☆',
-  'heart': '♥',
-  'heart-outline': '♡',
-  'location': '📍',
-  'calendar': '📅',
-  'clock': '🕐',
-  'document': '📄',
-  'image': '🖼',
-  'camera': '📷',
-  'lock': '🔒',
-  'unlock': '🔓',
-  'home': '🏠',
-  'menu': '☰',
-  'filter': '⚙',
-  'sort': '↕',
-  'alert': '⚠',
-  'info': 'ℹ',
-  'help': '?',
-  'success': '✓',
-  'error': '✕',
-  'warning': '⚠',
+const TEXT_ICON_MAP: Record<string, string> = {
+  google: 'G',
+  facebook: 'f',
+  apple: 'A',
 };
 
 const SIZE_MAP: Record<IconSize, number> = {
@@ -101,24 +34,32 @@ const Icon: React.FC<IconProps> = ({
   size = 'md',
   color = COLORS.gray700,
   style,
-  provider = 'text',
+  provider = 'lucide',
+  strokeWidth = 2.1,
+  fallback,
 }) => {
-  const iconSize = SIZE_MAP[size];
-  
-  // Get icon character from map
-  const getIconContent = () => {
-    if (provider === 'emoji') {
-      // For emoji provider, use the name directly as emoji
-      return name;
-    }
-    return ICON_MAP[name] || name.charAt(0).toUpperCase();
-  };
+  const iconSize = typeof size === 'number' ? size : SIZE_MAP[size];
+
+  if (provider !== 'lucide' || !isIconName(name)) {
+    const content =
+      provider === 'emoji'
+        ? name
+        : TEXT_ICON_MAP[name] || fallback || name.charAt(0).toUpperCase();
+
+    return (
+      <View style={[styles.container, { width: iconSize, height: iconSize }, style]}>
+        <Text style={[styles.iconFallback, { fontSize: iconSize, color }]}>
+          {content}
+        </Text>
+      </View>
+    );
+  }
+
+  const LucideIcon = ICON_COMPONENTS[name];
 
   return (
     <View style={[styles.container, { width: iconSize, height: iconSize }, style]}>
-      <Text style={[styles.icon, { fontSize: iconSize, color }]}>
-        {getIconContent()}
-      </Text>
+      <LucideIcon color={color} size={iconSize} strokeWidth={strokeWidth} />
     </View>
   );
 };
@@ -128,9 +69,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: {
+  iconFallback: {
     textAlign: 'center',
   },
 });
 
 export default Icon;
+export type { IconName };

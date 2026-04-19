@@ -10,6 +10,8 @@ import {
 import { Category } from '../../types';
 import { userService } from '../../services';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE } from '../../constants/config';
+import Icon from '../atoms/Icon';
+import { getCategoryIconName, type IconName } from '../../constants/iconography';
 
 interface CategoryPickerProps {
   label?: string;
@@ -39,16 +41,16 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
       const data = await userService.getCategories();
       setCategories(data);
     } catch (err) {
-      // Fallback categories if API fails
+      // Fallback categories if API fails - no emojis, use slug for icon mapping
       setCategories([
-        { id: '1', name: 'Electricista', slug: 'electricidad', icon: '⚡' },
-        { id: '2', name: 'Plomero', slug: 'plomeria', icon: '🔧' },
-        { id: '3', name: 'Gasista', slug: 'gas', icon: '🔥' },
-        { id: '4', name: 'Carpintero', slug: 'carpinteria', icon: '🪵' },
-        { id: '5', name: 'Pintor', slug: 'pintura', icon: '🎨' },
-        { id: '6', name: 'Jardinero', slug: 'jardineria', icon: '🌿' },
-        { id: '7', name: 'Limpeza', slug: 'limpieza', icon: '🧹' },
-        { id: '8', name: 'Aire Acondicionado', slug: 'aire-acondicionado', icon: '❄️' },
+        { id: '1', name: 'Electricista', slug: 'electricidad', icon: undefined },
+        { id: '2', name: 'Plomero', slug: 'plomeria', icon: undefined },
+        { id: '3', name: 'Gasista', slug: 'gas', icon: undefined },
+        { id: '4', name: 'Carpintero', slug: 'carpinteria', icon: undefined },
+        { id: '5', name: 'Pintor', slug: 'pintura', icon: undefined },
+        { id: '6', name: 'Jardinero', slug: 'jardineria', icon: undefined },
+        { id: '7', name: 'Limpeza', slug: 'limpieza', icon: undefined },
+        { id: '8', name: 'Aire Acondicionado', slug: 'aire-acondicionado', icon: undefined },
       ]);
     } finally {
       setLoading(false);
@@ -60,18 +62,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
     setShowPicker(false);
   };
 
-  const getCategoryIcon = (slug: string): string => {
-    const iconMap: Record<string, string> = {
-      electricidad: '⚡',
-      plomeria: '🔧',
-      gas: '🔥',
-      carpinteria: '🪵',
-      pintura: '🎨',
-      jardineria: '🌿',
-      limpieza: '🧹',
-      'aire-acondicionado': '❄️',
-    };
-    return iconMap[slug] || '🔨';
+  const getCategoryIcon = (slug: string): IconName => {
+    return getCategoryIconName(slug);
   };
 
   const renderCategory = ({ item }: { item: Category }) => (
@@ -82,9 +74,13 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
       ]}
       onPress={() => handleSelect(item)}
     >
-      <Text style={styles.categoryIcon}>
-        {item.icon || getCategoryIcon(item.slug)}
-      </Text>
+      <View style={styles.categoryIconContainer}>
+        <Icon
+          name={getCategoryIcon(item.slug)}
+          size="lg"
+          color={value?.id === item.id ? COLORS.primary : COLORS.gray600}
+        />
+      </View>
       <View style={styles.categoryInfo}>
         <Text
           style={[
@@ -99,7 +95,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
         )}
       </View>
       {value?.id === item.id && (
-        <Text style={styles.checkmark}>✓</Text>
+        <Icon name="check" size="md" color={COLORS.primary} />
       )}
     </TouchableOpacity>
   );
@@ -113,9 +109,13 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
       >
         {value ? (
           <View style={styles.selectedValue}>
-            <Text style={styles.selectedIcon}>
-              {value.icon || getCategoryIcon(value.slug)}
-            </Text>
+            <View style={styles.selectedIconContainer}>
+              <Icon
+                name={getCategoryIcon(value.slug)}
+                size="md"
+                color={COLORS.gray700}
+              />
+            </View>
             <Text style={styles.selectedText}>{value.name}</Text>
           </View>
         ) : (
@@ -139,7 +139,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                 style={styles.closeButton}
                 onPress={() => setShowPicker(false)}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Icon name="close" size="sm" color={COLORS.gray600} />
               </TouchableOpacity>
             </View>
 
@@ -191,8 +191,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  selectedIcon: {
-    fontSize: 20,
+  selectedIconContainer: {
     marginRight: SPACING.sm,
   },
   selectedText: {
@@ -247,10 +246,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  closeButtonText: {
-    fontSize: 16,
-    color: COLORS.gray600,
-  },
+
   listContent: {
     padding: SPACING.md,
   },
@@ -267,8 +263,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.primary,
   },
-  categoryIcon: {
-    fontSize: 28,
+  categoryIconContainer: {
     marginRight: SPACING.md,
   },
   categoryInfo: {
@@ -288,11 +283,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray500,
     marginTop: 2,
   },
-  checkmark: {
-    fontSize: 18,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
+
   loadingContainer: {
     padding: SPACING.xl,
     alignItems: 'center',

@@ -1,10 +1,11 @@
 import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
+import Icon, { type IconName } from '../atoms/Icon';
 
 interface CategoryCardProps {
   name: string;
-  icon?: string;
+  icon?: IconName;
   description?: string;
   professionalCount?: number;
   selected?: boolean;
@@ -14,7 +15,7 @@ interface CategoryCardProps {
 
 const CategoryCard: React.FC<CategoryCardProps> = ({
   name,
-  icon = '🔧',
+  icon = 'wrench',
   description,
   professionalCount,
   selected = false,
@@ -33,7 +34,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
       disabled={!onPress}
     >
       <View style={[styles.iconContainer, selected && styles.iconContainerSelected]}>
-        <Text style={styles.icon}>{icon}</Text>
+        <Icon name={icon} size="lg" color={selected ? COLORS.primary : COLORS.gray700} />
       </View>
       <Text
         style={[styles.name, selected && styles.nameSelected]}
@@ -53,7 +54,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
       )}
       {selected && (
         <View style={styles.selectedBadge}>
-          <Text style={styles.selectedBadgeText}>✓</Text>
+          <Icon name="check" size="xs" color={COLORS.white} strokeWidth={2.8} />
         </View>
       )}
     </TouchableOpacity>
@@ -87,9 +88,6 @@ const styles = StyleSheet.create({
   iconContainerSelected: {
     backgroundColor: COLORS.primary + '20',
   },
-  icon: {
-    fontSize: 24,
-  },
   name: {
     fontSize: FONT_SIZE.sm,
     fontWeight: FONT_WEIGHT.medium,
@@ -121,11 +119,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  selectedBadgeText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: FONT_WEIGHT.bold,
   },
 });
 

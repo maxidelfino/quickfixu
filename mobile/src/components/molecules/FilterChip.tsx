@@ -6,10 +6,11 @@ import {
   ViewStyle,
 } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
+import Icon, { type IconName } from '../atoms/Icon';
 
 interface FilterChipProps {
   label: string;
-  icon?: string;
+  icon?: IconName;
   selected?: boolean;
   onPress: () => void;
   style?: ViewStyle;
@@ -32,11 +33,14 @@ export const FilterChip: React.FC<FilterChipProps> = ({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {icon && (
-        <Text style={[styles.icon, selected && styles.iconSelected]}>
-          {icon}
-        </Text>
-      )}
+      {icon ? (
+        <Icon
+          name={icon}
+          size="sm"
+          color={selected ? COLORS.white : COLORS.gray600}
+          style={styles.icon}
+        />
+      ) : null}
       <Text style={[styles.label, selected && styles.labelSelected]}>
         {label}
       </Text>
@@ -61,11 +65,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   icon: {
-    fontSize: 16,
     marginRight: SPACING.xs,
-  },
-  iconSelected: {
-    // Emoji stays the same color
   },
   label: {
     fontSize: FONT_SIZE.sm,

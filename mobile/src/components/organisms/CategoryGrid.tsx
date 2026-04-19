@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { Category } from '../../types';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
+import Icon from '../atoms/Icon';
+import { getCategoryIconName } from '../../constants/iconography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_GAP = SPACING.md;
@@ -13,28 +15,11 @@ interface CategoryGridProps {
   professionalCounts?: Record<string, number>;
 }
 
-const DEFAULT_ICONS: Record<string, string> = {
-  electricidad: '⚡',
-  plomeria: '🔧',
-  gas: '🔥',
-  carpinteria: '🪵',
-  pintura: '🎨',
-  jardineria: '🌿',
-  limpieza: '🧹',
-  'aire-acondicionado': '❄️',
-  default: '🔨',
-};
-
 const CategoryGrid: React.FC<CategoryGridProps> = ({
   categories,
   onCategoryPress,
   professionalCounts = {},
 }) => {
-  const getCategoryIcon = (category: Category): string => {
-    if (category.icon) return category.icon;
-    return DEFAULT_ICONS[category.slug] || DEFAULT_ICONS.default;
-  };
-
   const getProfessionalCount = (slug: string): number | undefined => {
     const count = professionalCounts[slug];
     return count !== undefined ? count : undefined;
@@ -53,7 +38,11 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({
               activeOpacity={0.7}
             >
               <View style={styles.iconContainer}>
-                <Text style={styles.icon}>{getCategoryIcon(category)}</Text>
+                <Icon
+                  name={getCategoryIconName(category.slug, category.icon)}
+                  size={30}
+                  color={COLORS.primary}
+                />
               </View>
               <Text style={styles.name}>{category.name}</Text>
               {count !== undefined && (
@@ -98,9 +87,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.md,
-  },
-  icon: {
-    fontSize: 32,
   },
   name: {
     fontSize: FONT_SIZE.md,
