@@ -1,5 +1,15 @@
 # Proposal: Fase 6 - Admin Panel & OCR Certification Validation
 
+> **Historical artifact note (April 2026):** This proposal depends partly on the older payment-centric V1 model.
+>
+> Any references here to GMV, transactions, refunds, payouts, payment management, or MercadoPago operational flows are **superseded for current V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Keep this proposal for history only.
+
 **Change:** `fase-6-admin-ocr`  
 **Date:** Marzo 2026  
 **Status:** Proposed  

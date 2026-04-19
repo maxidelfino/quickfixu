@@ -1,5 +1,15 @@
 # Specification: Fase 4 - Payments & Appointments
 
+> **Historical artifact note (April 2026):** This specification captures a pre-pivot payments architecture and is no longer the active V1 contract.
+>
+> Current V1 source of truth is:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Keep this file for history only; do **not** implement its payment/escrow/payout requirements for current V1.
+
 ## 1. Introduction
 
 This specification defines the functional and non-functional requirements for **Fase 4: Payments & Appointments** of QuickFixU. It is derived from the approved exploration document and serves as the binding contract between backend and frontend teams.

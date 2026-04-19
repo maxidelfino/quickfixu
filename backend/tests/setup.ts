@@ -11,6 +11,7 @@ process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/quickfixu_test';
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.GOOGLE_GEOCODING_API_KEY = 'test-geocoding-key';
+process.env.ALLOW_MOCK_CLOUDINARY = 'true';
 
 // ============================================================
 // MOCK: Prisma Client
@@ -29,7 +30,34 @@ jest.mock('../src/config/database', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    request: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+    },
+    requestCategory: {
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    requestMedia: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    proposal: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+    },
+    appointment: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
     professionalCategory: {
+      findMany: jest.fn(),
       createMany: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -39,6 +67,9 @@ jest.mock('../src/config/database', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    category: {
+      findMany: jest.fn(),
+    },
     refreshToken: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -47,6 +78,7 @@ jest.mock('../src/config/database', () => {
       deleteMany: jest.fn(),
     },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
   };
   return { __esModule: true, default: mockPrisma };
 });

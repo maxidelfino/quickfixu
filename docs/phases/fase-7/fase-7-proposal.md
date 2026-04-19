@@ -1,5 +1,15 @@
 # Proposal: Fase 7 - Push Notifications & Polish
 
+> **Historical artifact note (April 2026):** This proposal includes notification scenarios inherited from the older payment-intermediary plan.
+>
+> Any references to payout releases, escrow, or payment-driven notifications are **superseded for current V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Keep this proposal as a historical phase artifact.
+
 **Change:** `fase-7-notifications-polish`  
 **Date:** Marzo 2026  
 **Status:** Proposed  

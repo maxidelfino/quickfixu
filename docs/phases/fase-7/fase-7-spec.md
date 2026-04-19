@@ -1,5 +1,16 @@
 # Specification: Fase 7 - Push Notifications & Polish
 
+> **Historical artifact note (April 2026):** This spec still references payment-release and payout notifications from the pre-pivot model.
+>
+> Those payment-oriented requirements are **superseded for current V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+> - `docs/backend/V1NotificationEventBoundaries.md`
+>
+> Keep this file for history only.
+
 **Change:** `fase-7-notifications-polish`  
 **Date:** Marzo 2026  
 **Type:** FULL SPEC (New Domain)  

@@ -1,3 +1,15 @@
+# Narrative - Historical Discovery Notes
+
+> **Status:** Historical artifact, not a living source-of-truth document.
+>
+> This file preserves early discovery questions and raw answers. It still includes pre-pivot assumptions such as transaction commissions, card capture, escrow, refunds, and payout penalties.
+>
+> For the current V1 business model, use these living docs instead:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+
 ### **1\. Descripción General del Proyecto**
 
 * ¿Cuál es la visión y misión de **QuickFixU**?

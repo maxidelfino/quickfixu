@@ -14,6 +14,9 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import professionalRoutes from './routes/professional.routes';
 import categoryRoutes from './routes/category.routes';
+import requestRoutes from './routes/request.routes';
+import proposalRoutes from './routes/proposal.routes';
+import appointmentRoutes from './routes/appointment.routes';
 
 // Load environment variables
 dotenv.config();
@@ -75,6 +78,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/professionals', professionalRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/proposals', proposalRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // ============================================================
 // 404 HANDLER

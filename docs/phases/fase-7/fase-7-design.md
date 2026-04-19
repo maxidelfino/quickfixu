@@ -1,5 +1,16 @@
 # Design: Fase 7 - Push Notifications & Polish
 
+> **Historical artifact note (April 2026):** This design contains payment-related notification flows from the earlier V1 concept.
+>
+> Escrow, payout-release, and payment-confirmation notification assumptions here are **superseded for current V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+> - `docs/backend/V1NotificationEventBoundaries.md`
+>
+> Preserve this file for historical reference only.
+
 ## 1. Technical Approach
 
 This design implements **Firebase Cloud Messaging (FCM) for push notifications**, **node-cron automated reminders**, **React Navigation deep linking**, and **comprehensive UX polish** for QuickFixU's final MVP phase.

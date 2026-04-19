@@ -1,19 +1,29 @@
-# Modelo de Datos QuickFixU - Versión Refinada
+# Modelo de Datos QuickFixU - V1 Marketplace
 
-**Versión:** 2.0  
-**Fecha:** Marzo 2026  
-**Status:** Actualizado con refinamientos MVP
+**Versión:** 2.2  
+**Fecha:** Abril 2026  
+**Status:** Living technical reference for current V1
 
 ---
 
 ## 1. Introducción
 
-Este documento describe la estructura completa del modelo de datos de QuickFixU, diseñado para soportar un marketplace bidireccional de servicios profesionales. El modelo está optimizado para:
+Este documento describe la estructura del modelo de datos de QuickFixU para el **V1 marketplace actual**, alineado con `docs/PRD.md`, `docs/FunctionalFlow.md` y `docs/backend/V1BackendContracts.md`.
+
+El modelo está optimizado para:
 
 - **Geolocalización eficiente**: Búsquedas en radio 30km con PostGIS
 - **Chat en tiempo real**: Arquitectura escalable con WebSockets
-- **Pagos seguros**: Retención hasta confirmación mutua
+- **Coordinación estructurada**: requests, propuestas, agenda y confirmación de finalización
 - **Reputación transparente**: Sistema bidireccional con constraints
+
+### Alcance V1 y nota de consistencia
+
+QuickFixU V1 **no procesa pagos dentro de la plataforma**.
+
+- El pago ocurre externamente entre cliente y profesional.
+- V1 excluye tarjetas, gateways, escrow, retenciones, comisiones por transacción, wallets y payout automation.
+- Si algún artefacto histórico de fases menciona esos conceptos, debe tratarse como **superseded / historical**, no como alcance vigente.
 
 **Stack Base de Datos:**
 - PostgreSQL 15+ con extensiones PostGIS y pg_trgm
@@ -47,7 +57,7 @@ Este documento describe la estructura completa del modelo de datos de QuickFixU,
 
 **Campos añadidos:**
 - `users.latitude` y `users.longitude` (ubicación principal usuario)
-- `posts.latitude` y `posts.longitude` (ubicación del problema, puede diferir de user)
+- `requests.latitude` y `requests.longitude` (ubicación del problema, puede diferir de user)
 
 **Tipo de dato:** `GEOGRAPHY(POINT, 4326)` (WGS84 - estándar GPS)
 
@@ -72,13 +82,13 @@ ORDER BY distance_km;
 ### 2.3 Migración de Tags a Relaciones Many-to-Many
 
 **Problema Original:**
-- `posts.tags` y `professionals.profession_tags` como VARCHAR (ej: "electricista,plomero")
+- `requests.tags` y `professionals.profession_tags` como VARCHAR (ej: "electricista,plomero")
 - Imposible hacer JOINs eficientes
 - Inconsistencias en capitalización/typos
 
 **Solución:**
 - Tabla `categories` normalizada (id, name, slug, icon_url)
-- Tablas pivot: `professional_categories` y `post_categories`
+- Tablas pivot: `professional_categories` y `request_categories`
 - Queries con JOINs estándar, índices en foreign keys
 
 **Migración de datos existentes:**
@@ -89,14 +99,14 @@ INSERT INTO categories (name, slug) VALUES
   ('Plomero', 'plomero'),
   ('Gasista', 'gasista');
 
--- Migrar posts
-INSERT INTO post_categories (post_id, category_id)
+-- Migrar requests
+INSERT INTO request_categories (request_id, category_id)
 SELECT p.id, c.id
-FROM posts p
+FROM requests p
 JOIN categories c ON LOWER(p.tags) LIKE '%' || c.slug || '%';
 
 -- Eliminar campo deprecated
-ALTER TABLE posts DROP COLUMN tags;
+ALTER TABLE requests DROP COLUMN tags;
 ```
 
 ---
@@ -104,24 +114,25 @@ ALTER TABLE posts DROP COLUMN tags;
 ### 2.4 Appointments como Entidad Separada
 
 **Razón:**
-- Una `proposal` es solo un presupuesto (puede ser rejected)
-- Un `appointment` es un trabajo **confirmado y agendado**
-- Separar permite trackear reprogramaciones, cancelaciones, estados específicos
+- Una `proposal` es solo una respuesta comercial/operativa a una `request`
+- Un `appointment` es el registro canónico del trabajo **seleccionado y en ejecución**
+- Separar permite trackear coordinación, agenda, cancelaciones y confirmación de finalización sin introducir estados de pago
 
 **Flujo:**
-1. Professional crea `proposal` (status: pending)
-2. Cliente acepta → `proposal.status` = accepted
-3. Se crea `appointment` (proposal_id FK, status: scheduled)
-4. Trabajo se completa → `appointment.status` = completed
-5. Review se asocia a `appointment_id` (NO proposal_id)
+1. Cliente publica `request`
+2. Professional crea `proposal` (status: `sent`)
+3. Cliente acepta → `proposal.status` = `accepted`
+4. Se crea `appointment` (status inicial: `coordinating` o `scheduled`)
+5. Ambas partes confirman finalización → `appointment.status` = `completed`
+6. `review` se asocia a `appointment_id` (NO proposal_id)
 
 ---
 
-### 2.5 Soft Delete en Posts
+### 2.5 Soft Delete en Requests
 
 **Implementación:**
 - Campo `deleted_at` (nullable timestamp)
-- Cronjob diario: Posts cerrados/expirados hace >90 días → `deleted_at = NOW()`
+- Cronjob diario: Requests cerradas/expiradas hace >90 días → `deleted_at = NOW()`
 - Queries siempre filtran `WHERE deleted_at IS NULL`
 - Permite auditoría/recovery sin pérdida datos
 
@@ -129,6 +140,27 @@ ALTER TABLE posts DROP COLUMN tags;
 - GDPR/compliance (usuario puede solicitar hard delete después)
 - Analytics históricos (patrones temporales)
 - Recovery ante errores
+
+---
+
+### 2.6 Naming y lifecycle canónicos para V1
+
+**Regla de naming:**
+- `request` es el nombre canónico backend/data-model para la necesidad publicada por el cliente.
+- `post` queda únicamente como alias histórico de migración y no debe usarse en nuevos contratos V1.
+- `appointment` es la entidad canónica para el trabajo seleccionado/en ejecución.
+- `service` o `job` pueden existir como copy de producto, pero no como entidades separadas.
+
+**Status canónicos:**
+- `request.status`: `draft`, `published`, `receiving_proposals`, `in_coordination`, `closed`, `completed`, `expired`
+- `proposal.status`: `sent`, `viewed`, `accepted`, `rejected`, `expired`, `withdrawn`
+- `appointment.status`: `coordinating`, `scheduled`, `in_progress`, `pending_completion_confirmation`, `completed`, `cancelled`
+
+**Reglas clave:**
+- `request.completed` es un resultado de negocio vinculado a un `appointment.completed`, no un reemplazo de la confirmación explícita.
+- `proposal.price` debe tratarse como referencia comercial (`price_reference` / `estimated_price` en contratos futuros), no como transacción.
+- `appointment.completed` requiere confirmación explícita de ambas partes.
+- Ninguna entidad V1 introduce `payment_status`, `escrow`, `payout` o equivalentes.
 
 ---
 
@@ -217,7 +249,6 @@ ALTER TABLE users ADD CONSTRAINT chk_oauth CHECK (
 | `dni` | VARCHAR(10) | NOT NULL | Duplicado de users.dni (denormalizado para queries rápidas) |
 | `hourly_rate` | DECIMAL(10,2) | NOT NULL | Tarifa por hora en ARS (ej: 4500.00) |
 | `available_schedule` | JSONB | NOT NULL | Horarios disponibilidad (ver ejemplo abajo) |
-| `credit_card_token` | VARCHAR(255) | NULLABLE | Token MercadoPago (para cobro comisiones cash) |
 | `is_verified` | BOOLEAN | DEFAULT FALSE | TRUE si tiene al menos 1 certificación aprobada |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha registro como profesional |
 | `updated_at` | TIMESTAMP | DEFAULT NOW() | Última modificación perfil |
@@ -251,7 +282,6 @@ CREATE INDEX idx_professionals_hourly_rate ON professionals(hourly_rate); -- Ord
   "dni": "38456789",
   "hourly_rate": 4500.00,
   "available_schedule": { /* ver arriba */ },
-  "credit_card_token": "mp_card_token_abc123xyz",
   "is_verified": true,
   "created_at": "2026-01-20T09:00:00Z",
   "updated_at": "2026-03-18T11:45:00Z"
@@ -390,9 +420,9 @@ ALTER TABLE certifications ADD CONSTRAINT chk_cert_reviewed CHECK (
 
 ---
 
-### 3.6 posts
+### 3.6 requests (legacy alias: `posts`)
 
-**Descripción:** Publicaciones de problemas por clientes. Visibles en feed profesionales.
+**Descripción:** Requests/problemas publicados por clientes. Es la entidad canónica del marketplace V1. `posts` queda como alias histórico de documentación previa.
 
 **Campos:**
 
@@ -404,7 +434,7 @@ ALTER TABLE certifications ADD CONSTRAINT chk_cert_reviewed CHECK (
 | `description` | TEXT | NOT NULL | Descripción detallada (max 500 chars frontend) |
 | `latitude` | DECIMAL(10,8) | NOT NULL | Ubicación problema (puede diferir user.latitude) |
 | `longitude` | DECIMAL(11,8) | NOT NULL | Ubicación problema |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'open' | 'open' / 'closed' / 'expired' / 'completed' |
+| `status` | VARCHAR(30) | NOT NULL, DEFAULT 'draft' | `draft` / `published` / `receiving_proposals` / `in_coordination` / `closed` / `completed` / `expired` |
 | `expires_at` | TIMESTAMP | NOT NULL | created_at + 48 horas (cronjob marca expired) |
 | `deleted_at` | TIMESTAMP | NULLABLE | Soft delete después 90 días |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha publicación |
@@ -412,18 +442,29 @@ ALTER TABLE certifications ADD CONSTRAINT chk_cert_reviewed CHECK (
 
 **Índices:**
 ```sql
-CREATE INDEX idx_posts_user_id ON posts(user_id);
-CREATE INDEX idx_posts_status ON posts(status);
-CREATE INDEX idx_posts_location ON posts USING GIST(ST_MakePoint(longitude, latitude)::geography);
-CREATE INDEX idx_posts_expires_at ON posts(expires_at); -- Cronjob expiración
-CREATE INDEX idx_posts_deleted_at ON posts(deleted_at); -- Filtrar soft deleted
-CREATE INDEX idx_posts_created_at ON posts(created_at DESC); -- Feed ordenado
+CREATE INDEX idx_requests_user_id ON requests(user_id);
+CREATE INDEX idx_requests_status ON requests(status);
+CREATE INDEX idx_requests_location ON requests USING GIST(ST_MakePoint(longitude, latitude)::geography);
+CREATE INDEX idx_requests_expires_at ON requests(expires_at); -- Cronjob expiración
+CREATE INDEX idx_requests_deleted_at ON requests(deleted_at); -- Filtrar soft deleted
+CREATE INDEX idx_requests_created_at ON requests(created_at DESC); -- Feed ordenado
 ```
 
 **Constraints:**
 ```sql
-ALTER TABLE posts ADD CONSTRAINT chk_post_status CHECK (status IN ('open', 'closed', 'expired', 'completed'));
+ALTER TABLE requests ADD CONSTRAINT chk_request_status CHECK (
+  status IN ('draft', 'published', 'receiving_proposals', 'in_coordination', 'closed', 'completed', 'expired')
+);
 ```
+
+**Semántica de estados:**
+- `draft`: request creada pero todavía no visible.
+- `published`: visible y abierta, todavía sin propuestas activas.
+- `receiving_proposals`: visible y con al menos una propuesta activa.
+- `in_coordination`: existe una propuesta aceptada y un `appointment` asociado.
+- `closed`: la request se cerró sin concretar trabajo.
+- `completed`: el trabajo asociado llegó a `appointment.completed`.
+- `expired`: venció la ventana para recibir propuestas sin concretar selección.
 
 **Ejemplo Datos:**
 ```json
@@ -434,7 +475,7 @@ ALTER TABLE posts ADD CONSTRAINT chk_post_status CHECK (status IN ('open', 'clos
   "description": "Pérdida constante de agua debajo de la pileta. El gabinete está mojado. Urgente.",
   "latitude": -34.599128,
   "longitude": -58.401432,
-  "status": "open",
+  "status": "receiving_proposals",
   "expires_at": "2026-03-23T22:00:00Z",
   "deleted_at": null,
   "created_at": "2026-03-21T22:00:00Z",
@@ -444,56 +485,56 @@ ALTER TABLE posts ADD CONSTRAINT chk_post_status CHECK (status IN ('open', 'clos
 
 ---
 
-### 3.7 post_categories
+### 3.7 request_categories (legacy alias: `post_categories`)
 
-**Descripción:** Tabla pivot many-to-many entre `posts` y `categories`. Un post puede necesitar múltiples profesiones.
+**Descripción:** Tabla pivot many-to-many entre `requests` y `categories`. Una request puede necesitar múltiples profesiones.
 
 **Campos:**
 
 | Campo | Tipo | Constraints | Descripción |
 |-------|------|-------------|-------------|
-| `post_id` | INTEGER | NOT NULL, FK → posts.id | Post |
+| `request_id` | INTEGER | NOT NULL, FK → requests.id | Request |
 | `category_id` | INTEGER | NOT NULL, FK → categories.id | Categoría |
-| PRIMARY KEY | | (post_id, category_id) | Composite PK |
+| PRIMARY KEY | | (request_id, category_id) | Composite PK |
 
 **Índices:**
 ```sql
-CREATE INDEX idx_post_cat_post ON post_categories(post_id);
-CREATE INDEX idx_post_cat_category ON post_categories(category_id);
+CREATE INDEX idx_request_cat_request ON request_categories(request_id);
+CREATE INDEX idx_request_cat_category ON request_categories(category_id);
 ```
 
 **Ejemplo Datos:**
 ```sql
--- Post "Fuga agua + Problemas luz" necesita Plomero Y Electricista
-INSERT INTO post_categories (post_id, category_id) VALUES
+-- Request "Fuga agua + Problemas luz" necesita Plomero Y Electricista
+INSERT INTO request_categories (request_id, category_id) VALUES
   (1, 2), -- Plomero
   (1, 1); -- Electricista
 ```
 
 ---
 
-### 3.8 post_media
+### 3.8 request_media (legacy alias: `post_media`)
 
-**Descripción:** Imágenes/videos asociados a posts. Relación 1-to-many (1 post → múltiples media).
+**Descripción:** Imágenes/videos asociados a requests. Relación 1-to-many (1 request → múltiples media).
 
 **Campos:**
 
 | Campo | Tipo | Constraints | Descripción |
 |-------|------|-------------|-------------|
 | `id` | SERIAL | PRIMARY KEY | Identificador único |
-| `post_id` | INTEGER | NOT NULL, FK → posts.id | Post dueño |
+| `request_id` | INTEGER | NOT NULL, FK → requests.id | Request dueña |
 | `media_type` | VARCHAR(10) | NOT NULL | 'image' / 'video' |
 | `media_url` | VARCHAR(500) | NOT NULL | URL Cloudinary |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha subida |
 
 **Índices:**
 ```sql
-CREATE INDEX idx_post_media_post_id ON post_media(post_id);
+CREATE INDEX idx_request_media_request_id ON request_media(request_id);
 ```
 
 **Constraints:**
 ```sql
-ALTER TABLE post_media ADD CONSTRAINT chk_media_type CHECK (media_type IN ('image', 'video'));
+ALTER TABLE request_media ADD CONSTRAINT chk_media_type CHECK (media_type IN ('image', 'video'));
 ```
 
 **Ejemplo Datos:**
@@ -501,14 +542,14 @@ ALTER TABLE post_media ADD CONSTRAINT chk_media_type CHECK (media_type IN ('imag
 [
   {
     "id": 1,
-    "post_id": 1,
+    "request_id": 1,
     "media_type": "image",
     "media_url": "https://res.cloudinary.com/quickfixu/image/upload/v1234/post_1_img1.jpg",
     "created_at": "2026-03-21T22:05:00Z"
   },
   {
     "id": 2,
-    "post_id": 1,
+    "request_id": 1,
     "media_type": "image",
     "media_url": "https://res.cloudinary.com/quickfixu/image/upload/v1234/post_1_img2.jpg",
     "created_at": "2026-03-21T22:05:00Z"
@@ -520,27 +561,27 @@ ALTER TABLE post_media ADD CONSTRAINT chk_media_type CHECK (media_type IN ('imag
 
 ### 3.9 proposals
 
-**Descripción:** Presupuestos enviados por profesionales a posts de clientes.
+**Descripción:** Propuestas enviadas por profesionales a requests de clientes. Su precio es una referencia comercial y NO un registro de pago.
 
 **Campos:**
 
 | Campo | Tipo | Constraints | Descripción |
 |-------|------|-------------|-------------|
 | `id` | SERIAL | PRIMARY KEY | Identificador único |
-| `post_id` | INTEGER | NOT NULL, FK → posts.id | Post al que responde |
+| `request_id` | INTEGER | NOT NULL, FK → requests.id | Request a la que responde |
 | `professional_id` | INTEGER | NOT NULL, FK → professionals.id | Profesional que envía |
-| `price` | DECIMAL(10,2) | NOT NULL | Precio total trabajo en ARS |
-| `description` | TEXT | NOT NULL | Detalles oferta (max 300 chars frontend) |
-| `scheduled_date` | DATE | NOT NULL | Fecha propuesta trabajo |
-| `scheduled_time` | TIME | NOT NULL | Hora propuesta trabajo |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | 'pending' / 'accepted' / 'rejected' / 'expired' / 'cancelled' |
+| `price_reference` | DECIMAL(10,2) | NOT NULL | Referencia comercial estimada en ARS |
+| `scope_notes` | TEXT | NOT NULL | Detalles de alcance/oferta |
+| `proposed_date` | DATE | NULLABLE | Fecha propuesta trabajo |
+| `proposed_time` | TIME | NULLABLE | Hora propuesta trabajo |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'sent' | `sent` / `viewed` / `accepted` / `rejected` / `expired` / `withdrawn` |
 | `expires_at` | TIMESTAMP | NOT NULL | created_at + 48 horas |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha envío |
 | `updated_at` | TIMESTAMP | DEFAULT NOW() | Última modificación |
 
 **Índices:**
 ```sql
-CREATE INDEX idx_proposals_post_id ON proposals(post_id);
+CREATE INDEX idx_proposals_request_id ON proposals(request_id);
 CREATE INDEX idx_proposals_professional_id ON proposals(professional_id);
 CREATE INDEX idx_proposals_status ON proposals(status);
 CREATE INDEX idx_proposals_expires_at ON proposals(expires_at);
@@ -549,21 +590,29 @@ CREATE INDEX idx_proposals_expires_at ON proposals(expires_at);
 **Constraints:**
 ```sql
 ALTER TABLE proposals ADD CONSTRAINT chk_proposal_status CHECK (
-  status IN ('pending', 'accepted', 'rejected', 'expired', 'cancelled')
+  status IN ('sent', 'viewed', 'accepted', 'rejected', 'expired', 'withdrawn')
 );
-ALTER TABLE proposals ADD CONSTRAINT chk_proposal_price CHECK (price > 0);
+ALTER TABLE proposals ADD CONSTRAINT chk_proposal_price CHECK (price_reference > 0);
 ```
+
+**Semántica de estados:**
+- `sent`: propuesta emitida y todavía no abierta por cliente.
+- `viewed`: cliente ya la vio, pero todavía no decidió.
+- `accepted`: elegida para abrir `appointment`.
+- `rejected`: descartada por el cliente.
+- `expired`: venció sin respuesta.
+- `withdrawn`: retirada por el profesional antes de decisión.
 
 **Ejemplo Datos:**
 ```json
 {
   "id": 1,
-  "post_id": 1,
+  "request_id": 1,
   "professional_id": 1,
-  "price": 8500.00,
-  "description": "Reparación fuga + cambio junta flexible. Incluye materiales.",
-  "scheduled_date": "2026-03-22",
-  "scheduled_time": "09:00:00",
+  "price_reference": 8500.00,
+  "scope_notes": "Reparación fuga + cambio junta flexible. Incluye materiales.",
+  "proposed_date": "2026-03-22",
+  "proposed_time": "09:00:00",
   "status": "accepted",
   "expires_at": "2026-03-23T22:30:00Z",
   "created_at": "2026-03-21T22:30:00Z",
@@ -575,7 +624,7 @@ ALTER TABLE proposals ADD CONSTRAINT chk_proposal_price CHECK (price > 0);
 
 ### 3.10 appointments
 
-**Descripción:** Trabajos agendados (cuando proposal es aceptada). Trackea reprogramaciones, cancelaciones, estados.
+**Descripción:** Trabajo seleccionado que pasa a coordinación/ejecución cuando una `proposal` es aceptada. Es la entidad canónica de servicio V1 y el dueño de la confirmación de finalización.
 
 **Campos:**
 
@@ -583,26 +632,37 @@ ALTER TABLE proposals ADD CONSTRAINT chk_proposal_price CHECK (price > 0);
 |-------|------|-------------|-------------|
 | `id` | SERIAL | PRIMARY KEY | Identificador único |
 | `proposal_id` | INTEGER | UNIQUE, NOT NULL, FK → proposals.id | Propuesta aceptada (1-to-1) |
-| `scheduled_date` | DATE | NOT NULL | Fecha trabajo (copiado de proposal, puede cambiar) |
-| `scheduled_time` | TIME | NOT NULL | Hora trabajo |
-| `status` | VARCHAR(30) | NOT NULL, DEFAULT 'scheduled' | Ver valores abajo |
+| `request_id` | INTEGER | NOT NULL, FK → requests.id | Request origen (denormalización útil para queries y trazabilidad) |
+| `scheduled_date` | DATE | NULLABLE | Fecha trabajo acordada |
+| `scheduled_time` | TIME | NULLABLE | Hora trabajo acordada |
+| `status` | VARCHAR(40) | NOT NULL, DEFAULT 'coordinating' | Ver valores abajo |
 | `rescheduled_count` | INTEGER | NOT NULL, DEFAULT 0 | Cantidad reprogramaciones (max 2) |
 | `cancellation_reason` | TEXT | NULLABLE | Motivo cancelación |
-| `cancelled_by` | VARCHAR(20) | NULLABLE | 'client' / 'professional' |
-| `penalty_applied` | BOOLEAN | DEFAULT FALSE | TRUE si se aplicó penalización 15% |
+| `cancelled_by` | VARCHAR(20) | NULLABLE | `client` / `professional` / `system` |
+| `client_confirmed_completion_at` | TIMESTAMP | NULLABLE | Momento en que cliente confirma finalización |
+| `professional_confirmed_completion_at` | TIMESTAMP | NULLABLE | Momento en que profesional confirma finalización |
+| `completed_at` | TIMESTAMP | NULLABLE | Se setea cuando ambas confirmaciones existen |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha agendado |
 | `updated_at` | TIMESTAMP | DEFAULT NOW() | Última modificación |
 
 **Status valores:**
-- `scheduled`: Agendado, esperando fecha
-- `in_progress`: Profesional marcó "En camino" o "Iniciado"
+- `coordinating`: propuesta aceptada, todavía definiendo agenda/detalles
+- `scheduled`: fecha/hora acordadas
+- `in_progress`: Trabajo en curso
+- `pending_completion_confirmation`: Trabajo realizado, falta confirmación mutua
 - `completed`: Ambos confirmaron finalización
-- `cancelled_by_client`: Cliente canceló (penalty a profesional)
-- `cancelled_by_professional`: Profesional canceló (penalty refund cliente)
+- `cancelled`: trabajo cancelado antes de completarse
+
+**Ownership de completion confirmation:**
+- `client_confirmed_completion_at` y `professional_confirmed_completion_at` son campos **almacenados**.
+- `appointment.status = completed` solo es válido cuando ambos campos son no nulos.
+- `completed_at` se almacena al momento de la segunda confirmación.
+- La elegibilidad para `reviews` depende de `completed_at`, nunca de pago externo.
 
 **Índices:**
 ```sql
 CREATE INDEX idx_appointments_proposal_id ON appointments(proposal_id);
+CREATE INDEX idx_appointments_request_id ON appointments(request_id);
 CREATE INDEX idx_appointments_status ON appointments(status);
 CREATE INDEX idx_appointments_scheduled_date ON appointments(scheduled_date);
 ```
@@ -610,12 +670,16 @@ CREATE INDEX idx_appointments_scheduled_date ON appointments(scheduled_date);
 **Constraints:**
 ```sql
 ALTER TABLE appointments ADD CONSTRAINT chk_appt_status CHECK (
-  status IN ('scheduled', 'in_progress', 'completed', 'cancelled_by_client', 'cancelled_by_professional')
+  status IN ('coordinating', 'scheduled', 'in_progress', 'pending_completion_confirmation', 'completed', 'cancelled')
 );
 ALTER TABLE appointments ADD CONSTRAINT chk_appt_rescheduled CHECK (rescheduled_count <= 2);
 ALTER TABLE appointments ADD CONSTRAINT chk_appt_cancelled CHECK (
-  (status LIKE 'cancelled%' AND cancelled_by IS NOT NULL AND cancellation_reason IS NOT NULL) OR
-  (status NOT LIKE 'cancelled%' AND cancelled_by IS NULL)
+  (status = 'cancelled' AND cancelled_by IS NOT NULL AND cancellation_reason IS NOT NULL) OR
+  (status <> 'cancelled' AND cancelled_by IS NULL)
+);
+ALTER TABLE appointments ADD CONSTRAINT chk_appt_completed CHECK (
+  (status = 'completed' AND client_confirmed_completion_at IS NOT NULL AND professional_confirmed_completion_at IS NOT NULL AND completed_at IS NOT NULL) OR
+  (status <> 'completed')
 );
 ```
 
@@ -624,13 +688,16 @@ ALTER TABLE appointments ADD CONSTRAINT chk_appt_cancelled CHECK (
 {
   "id": 1,
   "proposal_id": 1,
+  "request_id": 1,
   "scheduled_date": "2026-03-22",
   "scheduled_time": "09:00:00",
   "status": "completed",
   "rescheduled_count": 0,
   "cancellation_reason": null,
   "cancelled_by": null,
-  "penalty_applied": false,
+  "client_confirmed_completion_at": "2026-03-22T10:20:00Z",
+  "professional_confirmed_completion_at": "2026-03-22T10:30:00Z",
+  "completed_at": "2026-03-22T10:30:00Z",
   "created_at": "2026-03-21T23:15:00Z",
   "updated_at": "2026-03-22T10:30:00Z"
 }
@@ -640,7 +707,7 @@ ALTER TABLE appointments ADD CONSTRAINT chk_appt_cancelled CHECK (
 
 ### 3.11 chats
 
-**Descripción:** Conversaciones 1-to-1 entre cliente y profesional. Puede originarse desde post o búsqueda directa.
+**Descripción:** Conversaciones 1-to-1 entre cliente y profesional. Puede originarse desde request o búsqueda directa.
 
 **Campos:**
 
@@ -735,83 +802,25 @@ ALTER TABLE messages ADD CONSTRAINT chk_message_content CHECK (
 
 ---
 
-### 3.13 payments
+### 3.13 Explicit V1 exclusion: no payment entities
 
-**Descripción:** Transacciones de pago. Se crea cuando cliente acepta propuesta y paga. Relación con proposal y appointment.
+**Status:** Regla activa del modelo V1.
 
-**Campos:**
+QuickFixU V1 **no** define tablas, enums, campos ni máquinas de estado para pagos dentro de la plataforma.
 
-| Campo | Tipo | Constraints | Descripción |
-|-------|------|-------------|-------------|
-| `id` | SERIAL | PRIMARY KEY | Identificador único |
-| `proposal_id` | INTEGER | NULLABLE, FK → proposals.id | Propuesta asociada (si viene de post) |
-| `appointment_id` | INTEGER | NULLABLE, FK → appointments.id | Trabajo asociado |
-| `client_id` | INTEGER | NOT NULL, FK → users.id | Cliente que paga |
-| `professional_id` | INTEGER | NOT NULL, FK → users.id | Profesional que recibe |
-| `amount` | DECIMAL(10,2) | NOT NULL | Monto total trabajo (bruto) |
-| `commission_percentage` | DECIMAL(5,2) | NOT NULL | % comisión (0 / 10 / 50) |
-| `commission_amount` | DECIMAL(10,2) | NOT NULL | Monto comisión en ARS (amount * %) |
-| `net_amount` | DECIMAL(10,2) | NOT NULL | Monto neto profesional (amount - commission - penalty) |
-| `penalty_amount` | DECIMAL(10,2) | DEFAULT 0 | Penalización cancelación (15% amount) |
-| `penalty_reason` | VARCHAR(100) | NULLABLE | 'cancelled_by_client' / 'cancelled_by_professional' |
-| `payment_method` | VARCHAR(20) | NOT NULL | 'mercadopago' / 'cash' |
-| `mercadopago_payment_id` | VARCHAR(100) | NULLABLE | ID transacción MP (para tracking/webhooks) |
-| `currency` | VARCHAR(3) | DEFAULT 'ARS' | Moneda (preparado expansión) |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | 'pending' / 'completed' / 'refunded' / 'failed' |
-| `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha pago |
-| `updated_at` | TIMESTAMP | DEFAULT NOW() | Última modificación |
+**Guardrails del modelo activo:**
+- el precio puede existir en `proposals` solo como `price_reference`,
+- la coordinación y la confianza de cierre viven en `appointments`,
+- el pago final ocurre **fuera de la app**,
+- no se deben modelar `payments`, `payment_records`, `escrow`, `payouts`, `refunds`, `wallets` ni `balances` transaccionales.
 
-**Índices:**
-```sql
-CREATE INDEX idx_payments_proposal_id ON payments(proposal_id);
-CREATE INDEX idx_payments_appointment_id ON payments(appointment_id);
-CREATE INDEX idx_payments_client_id ON payments(client_id);
-CREATE INDEX idx_payments_professional_id ON payments(professional_id);
-CREATE INDEX idx_payments_status ON payments(status);
-CREATE INDEX idx_payments_mp_payment_id ON payments(mercadopago_payment_id);
-```
-
-**Constraints:**
-```sql
-ALTER TABLE payments ADD CONSTRAINT chk_payment_status CHECK (
-  status IN ('pending', 'completed', 'refunded', 'failed')
-);
-ALTER TABLE payments ADD CONSTRAINT chk_payment_method CHECK (
-  payment_method IN ('mercadopago', 'cash')
-);
-ALTER TABLE payments ADD CONSTRAINT chk_payment_amounts CHECK (
-  amount > 0 AND commission_amount >= 0 AND net_amount >= 0 AND penalty_amount >= 0
-);
-```
-
-**Ejemplo Datos:**
-```json
-{
-  "id": 1,
-  "proposal_id": 1,
-  "appointment_id": 1,
-  "client_id": 1,
-  "professional_id": 5,
-  "amount": 8500.00,
-  "commission_percentage": 0.00,
-  "commission_amount": 0.00,
-  "net_amount": 8500.00,
-  "penalty_amount": 0.00,
-  "penalty_reason": null,
-  "payment_method": "mercadopago",
-  "mercadopago_payment_id": "123456789",
-  "currency": "ARS",
-  "status": "completed",
-  "created_at": "2026-03-21T23:20:00Z",
-  "updated_at": "2026-03-22T10:35:00Z"
-}
-```
+Si una futura versión incorpora una capa financiera, deberá definirse desde cero en un documento separado y NO extender este modelo V1 por inercia.
 
 ---
 
 ### 3.14 reviews
 
-**Descripción:** Calificaciones bidireccionales. Se crea después de completar appointment + payment. Asociado a appointment (NO directamente a user).
+**Descripción:** Calificaciones bidireccionales. Se crea después de completar `appointment` y confirmar el trabajo. Asociado a `appointment` (NO directamente a user).
 
 **Campos:**
 
@@ -878,7 +887,7 @@ EXECUTE FUNCTION update_user_rating();
     "reviewer_id": 5,
     "reviewed_id": 1,
     "rating": 5,
-    "comment": "Excelente cliente, comunicativa y puntual en el pago. Un placer trabajar así.",
+    "comment": "Excelente cliente, comunicativa y muy clara durante toda la coordinación. Un placer trabajar así.",
     "created_at": "2026-03-22T11:32:00Z"
   }
 ]
@@ -886,98 +895,55 @@ EXECUTE FUNCTION update_user_rating();
 
 ---
 
-### 3.15 balances
+### 3.15 balances (historical pre-pivot concept)
 
-**Descripción:** Tracking deuda profesionales (cuando pago es en efectivo). Cobro automático fin de mes.
+**Status:** Superseded / out of scope for V1.
 
-**Campos:**
+Esta sección existía para modelar deudas y cobranzas automáticas a profesionales bajo un esquema de comisión por transacción. Ese enfoque ya no corresponde al V1 actual.
 
-| Campo | Tipo | Constraints | Descripción |
-|-------|------|-------------|-------------|
-| `id` | SERIAL | PRIMARY KEY | Identificador único |
-| `professional_id` | INTEGER | UNIQUE, NOT NULL, FK → professionals.id | Profesional (1-to-1) |
-| `balance` | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | Balance actual (negativo = deuda) |
-| `last_settlement_date` | TIMESTAMP | NULLABLE | Última fecha cobro exitoso |
-| `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha creación registro |
-| `updated_at` | TIMESTAMP | DEFAULT NOW() | Última modificación |
-
-**Índices:**
-```sql
-CREATE INDEX idx_balances_professional_id ON balances(professional_id);
-CREATE INDEX idx_balances_balance ON balances(balance) WHERE balance < 0; -- Solo deudas (partial index)
-```
-
-**Ejemplo Datos:**
-```json
-{
-  "id": 1,
-  "professional_id": 1,
-  "balance": -850.00,
-  "last_settlement_date": "2026-02-28T03:00:00Z",
-  "created_at": "2026-01-20T09:00:00Z",
-  "updated_at": "2026-03-22T10:35:00Z"
-}
-```
-
-**Cálculo balance:**
-- Cliente paga ARS 8,500 en efectivo
-- Comisión 10% = ARS 850
-- Se resta de balance: `balance -= 850` → balance = -850 (deuda)
-- Fin mes: Cronjob cobra ARS 850 de tarjeta profesional → balance = 0
+**No usar en V1 para:**
+- comisiones sobre trabajos,
+- deuda por cobros en efectivo,
+- settlement automático,
+- cobro de tarjetas almacenadas.
 
 ---
 
-### 3.16 bonuses
+### 3.16 professional_subscriptions (future monetization direction)
 
-**Descripción:** Bonos fidelización profesionales (FASE 2 - preparar estructura). Cada 20 trabajos = 25% total.
+**Status:** Futuro / explícitamente fuera del alcance V1 actual.
 
-**Campos:**
+Si QuickFixU monetiza según la dirección vigente, el camino preferido es **suscripción para profesionales** y NO comisión por transacción.
 
-| Campo | Tipo | Constraints | Descripción |
-|-------|------|-------------|-------------|
-| `id` | SERIAL | PRIMARY KEY | Identificador único |
-| `professional_id` | INTEGER | NOT NULL, FK → professionals.id | Profesional |
-| `jobs_completed_count` | INTEGER | NOT NULL | Cantidad trabajos completados (ej: 20, 40, 60) |
-| `bonus_amount` | DECIMAL(10,2) | NOT NULL | Monto bono calculado (25% total 20 trabajos) |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | 'pending' / 'paid' |
-| `created_at` | TIMESTAMP | DEFAULT NOW() | Fecha desbloqueado bono |
-| `paid_at` | TIMESTAMP | NULLABLE | Fecha pago bono |
+**Capacidades futuras posibles:**
+- badge verificado premium,
+- ranking boost,
+- mayor visibilidad,
+- mejores recomendaciones,
+- exposición destacada del perfil.
 
-**Índices:**
-```sql
-CREATE INDEX idx_bonuses_professional_id ON bonuses(professional_id);
-CREATE INDEX idx_bonuses_status ON bonuses(status);
-```
+**Boundary note:** esta dirección comercial está documentada en `docs/PRD.md` y `docs/BusinessCase.md`, pero su modelo de datos detallado todavía no forma parte del alcance implementable de V1.
 
-**Constraints:**
-```sql
-ALTER TABLE bonuses ADD CONSTRAINT chk_bonus_status CHECK (status IN ('pending', 'paid'));
-ALTER TABLE bonuses ADD CONSTRAINT chk_bonus_amount CHECK (bonus_amount > 0);
-```
+**No modelar todavía en V1:**
+- tablas `subscriptions`, `plans`, `invoices`, `billing_accounts` o equivalentes,
+- `plan_id`, `subscription_status`, `billing_cycle`, `renewal_at`, `entitlement_*`,
+- flujos de compra móvil, App Store / Play Store billing, webhooks de billing provider,
+- flags de paywall o gating premium,
+- monetización del ranking dentro del algoritmo activo V1.
 
-**Ejemplo Datos:**
-```json
-{
-  "id": 1,
-  "professional_id": 1,
-  "jobs_completed_count": 20,
-  "bonus_amount": 42500.00,
-  "status": "pending",
-  "created_at": "2026-04-15T10:00:00Z",
-  "paid_at": null
-}
-```
+**Regla de naming:** `verification_status`, `certification_status`, reviews y rating siguen siendo señales de confianza V1. No deben reinterpretarse como beneficios pagos.
 
-**Cálculo:**
-- Trabajos 1-20 totalizaron ARS 170,000
-- Bono 25% = ARS 42,500
-- Profesional lo solicita en app → Admin aprueba → Payout MP
+**Referencia activa:** `docs/backend/V1SubscriptionBoundary.md`
 
 ---
 
 ### 3.17 notifications
 
-**Descripción:** Log notificaciones push enviadas. Útil para debugging, analytics, re-envío fallidos.
+**Status:** Opcional para V1 / alineado a marketplace-only.
+
+**Descripción:** Log liviano de eventos/notificaciones para soporte in-app, auditoría básica y deep links. No requiere implementar push, cronjobs ni infraestructura de mensajería en esta etapa.
+
+**Referencia activa:** `docs/backend/V1NotificationEventBoundaries.md`
 
 **Campos:**
 
@@ -986,23 +952,43 @@ ALTER TABLE bonuses ADD CONSTRAINT chk_bonus_amount CHECK (bonus_amount > 0);
 | `id` | SERIAL | PRIMARY KEY | Identificador único |
 | `user_id` | INTEGER | NOT NULL, FK → users.id | Destinatario |
 | `type` | VARCHAR(50) | NOT NULL | Tipo notificación (ver lista abajo) |
-| `title` | VARCHAR(100) | NOT NULL | Título push |
+| `title` | VARCHAR(100) | NOT NULL | Título mostrado al usuario |
 | `body` | TEXT | NOT NULL | Cuerpo mensaje |
 | `data` | JSONB | NULLABLE | Payload adicional (deep link info) |
 | `read` | BOOLEAN | DEFAULT FALSE | TRUE si usuario abrió notificación |
-| `sent_at` | TIMESTAMP | DEFAULT NOW() | Timestamp envío FCM |
+| `sent_at` | TIMESTAMP | DEFAULT NOW() | Timestamp de entrega/registro |
 | `created_at` | TIMESTAMP | DEFAULT NOW() | Timestamp creación registro |
 
-**Tipos notificación (type):**
-- `new_proposal` - Nueva propuesta recibida
-- `message` - Nuevo mensaje chat
-- `proposal_expiring` - Propuesta expira en 24hs
-- `appointment_reminder_24h` - Recordatorio 24hs antes
-- `appointment_reminder_1h` - Recordatorio 1h antes
-- `appointment_completed` - Profesional marcó completado
-- `payment_received` - Pago liberado a profesional
-- `review_reminder` - Recordatorio dejar review
-- `rescheduled_request` - Solicitud reprogramación
+**Tipos notificación (type) aprobados para V1:**
+
+**Core ahora:**
+- `proposal_received` - Cliente recibe nueva propuesta en su request
+- `proposal_status_changed` - Profesional recibe aceptación/rechazo de propuesta
+- `message_received` - Participante recibe nuevo mensaje de coordinación
+- `appointment_scheduled` - Appointment queda agendado por primera vez
+- `appointment_updated` - Cambian horario, lugar o instrucciones relevantes
+- `appointment_cancelled` - La contraparte cancela el appointment
+- `completion_confirmation_requested` - Una parte marcó trabajo realizado y espera confirmación de la otra
+- `completion_confirmed` - Ambas partes confirmaron el trabajo
+- `review_received` - Un usuario recibe una nueva review publicada sobre su trabajo/experiencia
+- `certification_status_changed` - Profesional recibe aprobación o rechazo de certificación
+
+**Válidos para después si el equipo realmente los necesita:**
+- `appointment_reminder_24h`
+- `appointment_reminder_1h`
+- `review_reminder`
+- `proposal_expiring`
+- `request_expiring`
+- `new_request_match`
+- `new_professional_in_area`
+
+**Tipos explícitamente excluidos de V1:**
+- cualquier `payment_*`
+- cualquier `payout_*`
+- cualquier `refund_*`
+- `dispute_resolved` cuando implique settlement/refund/payout
+- `commission_*`
+- `wallet_*`
 
 **Índices:**
 ```sql
@@ -1015,10 +1001,10 @@ CREATE INDEX idx_notifications_sent_at ON notifications(sent_at DESC);
 **data JSON Ejemplo:**
 ```json
 {
-  "type": "new_proposal",
+  "type": "proposal_received",
   "proposalId": 123,
-  "chatId": 456,
-  "deepLink": "quickfixu://chat/456"
+  "requestId": 45,
+  "deepLink": "quickfixu://requests/45?proposalId=123"
 }
 ```
 
@@ -1027,7 +1013,7 @@ CREATE INDEX idx_notifications_sent_at ON notifications(sent_at DESC);
 {
   "id": 1,
   "user_id": 1,
-  "type": "new_proposal",
+  "type": "proposal_received",
   "title": "🎉 Nueva propuesta",
   "body": "Martín envió un presupuesto: ARS 8,500",
   "data": { /* ver arriba */ },
@@ -1046,25 +1032,22 @@ CREATE INDEX idx_notifications_sent_at ON notifications(sent_at DESC);
 **One-to-One (1:1):**
 - `users` ↔ `professionals` (user_id UNIQUE)
 - `proposals` ↔ `appointments` (proposal_id UNIQUE)
-- `professionals` ↔ `balances` (professional_id UNIQUE)
 
 **One-to-Many (1:N):**
-- `users` → `posts` (1 user, múltiples posts)
+- `users` → `requests` (1 user, múltiples requests)
 - `users` → `chats` (como client_id o professional_id)
 - `chats` → `messages` (1 chat, múltiples mensajes)
-- `posts` → `post_media` (1 post, múltiples imágenes/videos)
-- `posts` → `proposals` (1 post, múltiples propuestas)
+- `requests` → `request_media` (1 request, múltiples imágenes/videos)
+- `requests` → `proposals` (1 request, múltiples propuestas)
 - `professionals` → `proposals` (1 profesional, múltiples propuestas)
 - `professionals` → `certifications` (1 profesional, múltiples certificaciones)
-- `professionals` → `bonuses` (1 profesional, múltiples bonos)
 - `users` → `reviews` (como reviewer_id o reviewed_id)
-- `users` → `payments` (como client_id o professional_id)
 - `appointments` → `reviews` (1 appointment, 2 reviews max - bidireccional)
 - `users` → `notifications` (1 user, múltiples notificaciones)
 
 **Many-to-Many (N:M):**
 - `professionals` ↔ `categories` (via `professional_categories`)
-- `posts` ↔ `categories` (via `post_categories`)
+- `requests` ↔ `categories` (via `request_categories`)
 
 ---
 
@@ -1077,7 +1060,7 @@ CREATE INDEX idx_notifications_sent_at ON notifications(sent_at DESC);
 ALTER TABLE professionals ADD CONSTRAINT fk_professionals_user
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 
-ALTER TABLE posts ADD CONSTRAINT fk_posts_user
+ALTER TABLE requests ADD CONSTRAINT fk_requests_user
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 
 ALTER TABLE chats ADD CONSTRAINT fk_chats_client
@@ -1086,9 +1069,9 @@ ALTER TABLE chats ADD CONSTRAINT fk_chats_client
 ALTER TABLE chats ADD CONSTRAINT fk_chats_professional
   FOREIGN KEY (professional_id) REFERENCES users(id) ON DELETE CASCADE;
 
--- Si post se borra (hard delete), borrar propuestas asociadas
-ALTER TABLE proposals ADD CONSTRAINT fk_proposals_post
-  FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE;
+-- Si request se borra (hard delete), borrar propuestas asociadas
+ALTER TABLE proposals ADD CONSTRAINT fk_proposals_request
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE;
 
 -- Si professional se borra, NO borrar proposals (mantener historial)
 ALTER TABLE proposals ADD CONSTRAINT fk_proposals_professional
@@ -1097,13 +1080,6 @@ ALTER TABLE proposals ADD CONSTRAINT fk_proposals_professional
 -- Si proposal se borra, NO permitir (appointments debe existir siempre)
 ALTER TABLE appointments ADD CONSTRAINT fk_appointments_proposal
   FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE RESTRICT;
-
--- Payments no se pueden borrar nunca (auditoría fiscal)
-ALTER TABLE payments ADD CONSTRAINT fk_payments_client
-  FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE RESTRICT;
-
-ALTER TABLE payments ADD CONSTRAINT fk_payments_professional
-  FOREIGN KEY (professional_id) REFERENCES users(id) ON DELETE RESTRICT;
 
 -- Reviews no se pueden borrar (reputación permanente)
 ALTER TABLE reviews ADD CONSTRAINT fk_reviews_appointment
@@ -1117,12 +1093,12 @@ ALTER TABLE reviews ADD CONSTRAINT fk_reviews_appointment
 **Ver sección 6 completa con SQL detallado.**
 
 **Resumen índices críticos:**
-1. **Geolocalización**: GIST en users.location y posts.location (búsquedas <50ms)
+1. **Geolocalización**: GIST en users.location y requests.location (búsquedas <50ms)
 2. **Chat ordenado**: B-tree en chats.last_message_at DESC (lista conversaciones)
-3. **Feed posts**: B-tree en posts.created_at DESC + status (timeline rápido)
+3. **Feed requests**: B-tree en requests.created_at DESC + status (timeline rápido)
 4. **Búsqueda profesionales**: Composite en (category_id, is_verified, hourly_rate)
 5. **Notificaciones no leídas**: Partial index en notifications WHERE read=FALSE
-6. **Expiración posts/proposals**: B-tree en expires_at (cronjob eficiente)
+6. **Expiración requests/proposals**: B-tree en expires_at (cronjob eficiente)
 
 ---
 
@@ -1169,7 +1145,7 @@ LIMIT 50;
 
 ---
 
-### 6.2 Feed de Posts para Profesional
+### 6.2 Feed de Requests para Profesional
 
 ```sql
 -- Input: professional_id=5, professional_location, categories=[1,2]
@@ -1185,13 +1161,13 @@ SELECT
     :professional_location
   ) / 1000 AS distance_km,
   ARRAY_AGG(c.name) AS categories,
-  (SELECT COUNT(*) FROM proposals WHERE post_id = p.id) AS proposal_count
-FROM posts p
+  (SELECT COUNT(*) FROM proposals WHERE request_id = p.id) AS proposal_count
+FROM requests p
 JOIN users u ON p.user_id = u.id
-JOIN post_categories pc ON p.id = pc.post_id
+JOIN request_categories pc ON p.id = pc.request_id
 JOIN categories c ON pc.category_id = c.id
 WHERE 
-  p.status = 'open'
+  p.status IN ('published', 'receiving_proposals')
   AND p.deleted_at IS NULL
   AND p.expires_at > NOW()
   AND ST_DWithin(
@@ -1205,7 +1181,7 @@ ORDER BY p.created_at DESC
 LIMIT 20;
 ```
 
-**Performance:** <200ms con 5K posts activos
+**Performance:** <200ms con 5K requests activas
 
 ---
 
@@ -1242,8 +1218,8 @@ SELECT
   a.scheduled_date,
   a.scheduled_time,
   a.status,
-  pr.price,
-  po.title AS post_title,
+  pr.price_reference,
+  rq.title AS request_title,
   u.full_name AS client_name,
   u.phone AS client_phone,
   u.address AS client_address,
@@ -1251,8 +1227,8 @@ SELECT
   ST_X(ST_MakePoint(u.longitude, u.latitude)) AS client_lng
 FROM appointments a
 JOIN proposals pr ON a.proposal_id = pr.id
-JOIN posts po ON pr.post_id = po.id
-JOIN users u ON po.user_id = u.id
+JOIN requests rq ON pr.request_id = rq.id
+JOIN users u ON rq.user_id = u.id
 WHERE 
   pr.professional_id = :professional_id
   AND a.scheduled_date BETWEEN :start_date AND :end_date
@@ -1364,7 +1340,6 @@ psql -h host -U user -d quickfixu_prod < backup_20260321.sql
 
 **Encriptados en BD:**
 - `users.password_hash` (bcrypt cost 12)
-- `professionals.credit_card_token` (tokenizado MP, NO guardamos número real)
 
 **Encriptados en tránsito:**
 - Todas requests HTTPS (TLS 1.3)
@@ -1381,14 +1356,14 @@ psql -h host -U user -d quickfixu_prod < backup_20260321.sql
 
 **Logs críticos:**
 - Tabla `audit_logs` (Fase 2):
-  - `user_id`, `action` (ej: 'update_payment_status'), `old_value`, `new_value`, `ip_address`, `timestamp`
-- Retención: 1 año (compliance fiscal Argentina)
+  - `user_id`, `action` (ej: 'approve_certification'), `old_value`, `new_value`, `ip_address`, `timestamp`
+- Retención: 1 año
 
 **Eventos auditados:**
-- Cambios payment.status
+- Cambios de estado en `appointments`
 - Aprobación/rechazo certificaciones
 - Bloqueos usuarios (is_active=FALSE)
-- Refunds (payment.status='refunded')
+- Confirmaciones de finalización y acciones de moderación relevantes
 
 ---
 
@@ -1412,16 +1387,16 @@ Este modelo de datos está diseñado para:
 - ✅ **Integridad**: Constraints + triggers garantizan consistencia
 - ✅ **Auditoría**: Soft deletes, timestamps, logs
 - ✅ **Flexibilidad**: JSONB permite evolución sin migrations (horarios, OCR data)
-- ✅ **Seguridad**: Encriptación, PII protegida, compliance GDPR
+- ✅ **Seguridad**: PII protegida y reglas claras para un marketplace sin fintech en V1
 
 **Próximos pasos:**
 1. Implementar schema en Prisma (`schema.prisma`)
 2. Ejecutar migrations en desarrollo
-3. Seed BD con datos ejemplo (categorías, users test, posts ficticios)
+3. Seed BD con datos ejemplo (categorías, users test, requests ficticias)
 4. Testing queries performance con dataset 1K registros
 5. Deploy staging + validación E2E
 
 ---
 
-**Fin Documento Modelo de Datos - v2.0**  
-*Última actualización: Marzo 2026*
+**Fin Documento Modelo de Datos - v2.2**  
+*Última actualización: Abril 2026*

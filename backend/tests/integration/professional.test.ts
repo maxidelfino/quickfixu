@@ -8,6 +8,13 @@ import { signToken } from '../../src/config/jwt';
 
 const mockPrisma = prisma as any;
 
+const mockAuthenticatedProfessional = {
+  id: 1,
+  email: 'juan@example.com',
+  isActive: true,
+  professional: { id: 10, userId: 1 },
+};
+
 // ============================================================
 // TEST FIXTURES
 // ============================================================
@@ -43,7 +50,7 @@ const mockProfessionalProfile = {
   userId: 1,
   description: 'Plomero con experiencia',
   yearsExperience: 5,
-  categories: [{ id: 1, name: 'Plomería', slug: 'plomeria', icon: '🔧' }],
+  categories: [{ category: { id: 1, name: 'Plomería', slug: 'plomeria', icon: '🔧' } }],
   certifications: [],
   user: {
     id: 1,
@@ -68,7 +75,8 @@ function bearerToken(userId = 1): string {
 
 describe('GET /api/professionals/me', () => {
   it('should return 200 with professional profile when authenticated', async () => {
-    mockPrisma.professional.findUnique.mockResolvedValue(mockProfessionalUser);
+    mockPrisma.professional.findUnique.mockResolvedValue(mockProfessionalProfile);
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
 
     const res = await request(app)
       .get('/api/professionals/me')
@@ -91,9 +99,9 @@ describe('GET /api/professionals/me', () => {
 
 describe('PATCH /api/professionals/me', () => {
   it('should update professional profile and return 200', async () => {
-    mockPrisma.professional.findUnique.mockResolvedValue({ id: 10, userId: 1 });
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
+    mockPrisma.professional.findUnique.mockResolvedValue(mockProfessionalProfile);
     mockPrisma.professional.update.mockResolvedValue({});
-    mockPrisma.professional.findUnique.mockResolvedValue(mockProfessionalUser);
 
     const res = await request(app)
       .patch('/api/professionals/me')
@@ -107,6 +115,8 @@ describe('PATCH /api/professionals/me', () => {
   });
 
   it('should return 400 when description is too short', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
+
     const res = await request(app)
       .patch('/api/professionals/me')
       .set('Authorization', bearerToken(1))
@@ -131,7 +141,7 @@ describe('PATCH /api/professionals/me', () => {
 describe('GET /api/professionals/:id', () => {
   it('should return 200 with public profile', async () => {
     mockPrisma.professional.findUnique.mockResolvedValue({
-      ...mockProfessionalUser,
+      ...mockProfessionalProfile,
       certifications: [{ id: 1, status: 'approved', fileUrl: 'url', uploadedAt: new Date(), deletedAt: null }],
     });
 
@@ -209,6 +219,7 @@ describe('GET /api/professionals/search', () => {
 
 describe('POST /api/professionals/me/certifications', () => {
   it('should upload certification and return 201', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
     mockPrisma.professional.findUnique.mockResolvedValue({ id: 10, userId: 1 });
 
     const res = await request(app)
@@ -221,6 +232,8 @@ describe('POST /api/professionals/me/certifications', () => {
   });
 
   it('should return 400 when no file provided', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
+
     const res = await request(app)
       .post('/api/professionals/me/certifications')
       .set('Authorization', bearerToken(1));
@@ -235,6 +248,7 @@ describe('POST /api/professionals/me/certifications', () => {
 
 describe('GET /api/professionals/me/certifications', () => {
   it('should return list of certifications', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
     mockPrisma.professional.findUnique.mockResolvedValue({ id: 10, userId: 1 });
     mockPrisma.certification.findMany.mockResolvedValue([
       { id: 1, fileUrl: 'url', status: 'pending', uploadedAt: new Date() },
@@ -255,10 +269,12 @@ describe('GET /api/professionals/me/certifications', () => {
 
 describe('DELETE /api/professionals/me/certifications/:id', () => {
   it('should delete certification and return 204', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
     mockPrisma.professional.findUnique.mockResolvedValue({ id: 10, userId: 1 });
     mockPrisma.certification.findUnique.mockResolvedValue({
       id: 1,
       professionalId: 10,
+      fileUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/quickfixu/certifications/10/cert.pdf',
       status: 'pending',
       deletedAt: null,
     });
@@ -271,10 +287,12 @@ describe('DELETE /api/professionals/me/certifications/:id', () => {
   });
 
   it('should return 403 when trying to delete approved certification', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(mockAuthenticatedProfessional);
     mockPrisma.professional.findUnique.mockResolvedValue({ id: 10, userId: 1 });
     mockPrisma.certification.findUnique.mockResolvedValue({
       id: 1,
       professionalId: 10,
+      fileUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/quickfixu/certifications/10/cert.pdf',
       status: 'approved',
       deletedAt: null,
     });

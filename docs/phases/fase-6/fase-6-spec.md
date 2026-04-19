@@ -1,5 +1,15 @@
 # Specification: Fase 6 - Admin Panel & OCR Certification Validation
 
+> **Historical artifact note (April 2026):** This spec mixes still-relevant admin work with pre-pivot payment operations.
+>
+> Payment/refund/payout/webhook requirements in this file are **superseded for current V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Keep this spec for historical traceability only.
+
 ## 1. Introduction
 
 This specification defines the functional and non-functional requirements for **Fase 6: Admin Panel & OCR Certification Validation** of QuickFixU. It is derived from the approved exploration document and serves as the binding contract between backend and frontend teams.

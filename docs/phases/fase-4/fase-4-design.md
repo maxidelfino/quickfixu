@@ -1,5 +1,15 @@
 # Design: Fase 4 - Payments & Appointments
 
+> **Historical artifact note (April 2026):** This design was written before the V1 marketplace pivot.
+>
+> All payment, escrow, commission, refund, payout, and MercadoPago assumptions in this file are **superseded for V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Preserve this document for historical context only.
+
 **Change name:** `fase-4-payments-appointments`  
 **Date:** Marzo 2026  
 **Status:** Design Complete  

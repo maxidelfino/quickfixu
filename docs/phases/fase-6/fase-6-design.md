@@ -1,5 +1,15 @@
 # Technical Design Document: Fase 6 - Admin Panel & OCR Certification Validation
 
+> **Historical artifact note (April 2026):** This design includes admin capabilities tied to the earlier in-app payments architecture.
+>
+> Refund, payout, payment analytics, MercadoPago integration, and similar fintech-oriented sections are **superseded for V1** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Preserve this file as a historical phase artifact, not as current V1 guidance.
+
 **Change:** `fase-6-admin-ocr`  
 **Version:** 1.0  
 **Date:** March 2026  

@@ -23,6 +23,8 @@ export interface UpdateProfessionalDto {
   categoryIds?: number[];
 }
 
+const ARGENTINE_PHONE_REGEX = /^\+54 9 (11|[2-9]\d{1,2}) \d{4}-\d{4}$/;
+
 class UserService {
   /**
    * Get user profile by ID with professional data
@@ -76,6 +78,9 @@ class UserService {
     }
 
     if (data.phone !== undefined) {
+      if (!ARGENTINE_PHONE_REGEX.test(data.phone)) {
+        throw new AppError(400, 'Invalid phone format. Use: +54 9 11 1234-5678');
+      }
       updateData.phone = data.phone;
     }
 

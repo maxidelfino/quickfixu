@@ -10,6 +10,11 @@ describe('Database Configuration', () => {
     expect(prisma).toBeDefined();
     expect(prisma).toHaveProperty('user');
     expect(prisma).toHaveProperty('professional');
+    expect(prisma).toHaveProperty('request');
+    expect(prisma).toHaveProperty('requestCategory');
+    expect(prisma).toHaveProperty('requestMedia');
+    expect(prisma).toHaveProperty('proposal');
+    expect(prisma).toHaveProperty('appointment');
     expect(prisma).toHaveProperty('refreshToken');
     expect(prisma).toHaveProperty('$transaction');
   });
@@ -25,6 +30,26 @@ describe('Database Configuration', () => {
     expect(prisma.professional).toBeDefined();
     expect(typeof prisma.professional.findUnique).toBe('function');
     expect(typeof prisma.professional.create).toBe('function');
+  });
+
+  it('should have marketplace V1 foundation models available', () => {
+    expect(prisma.request).toBeDefined();
+    expect(typeof prisma.request.findUnique).toBe('function');
+    expect(typeof prisma.request.create).toBe('function');
+
+    expect(prisma.requestCategory).toBeDefined();
+    expect(typeof prisma.requestCategory.createMany).toBe('function');
+
+    expect(prisma.requestMedia).toBeDefined();
+    expect(typeof prisma.requestMedia.create).toBe('function');
+
+    expect(prisma.proposal).toBeDefined();
+    expect(typeof prisma.proposal.findMany).toBe('function');
+    expect(typeof prisma.proposal.create).toBe('function');
+
+    expect(prisma.appointment).toBeDefined();
+    expect(typeof prisma.appointment.findUnique).toBe('function');
+    expect(typeof prisma.appointment.update).toBe('function');
   });
 
   it('should have refreshToken model available', () => {

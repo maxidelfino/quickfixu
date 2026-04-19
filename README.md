@@ -1,6 +1,6 @@
 # QuickFixU Monorepo
 
-QuickFixU is a marketplace platform that connects clients with trusted service professionals such as electricians, plumbers, and gas technicians. This repository groups the backend API, the mobile application, and the product documentation in a single monorepo.
+QuickFixU is a marketplace platform that connects clients with trusted service professionals such as electricians, plumbers, and gas technicians. V1 focuses on discovery, requests/problems, proposals, coordination, and completion confirmation. Payment happens outside the app (for example cash or bank transfer), so V1 does not include in-app payment processing or financial intermediation. This repository groups the backend API, the mobile application, and the product documentation in a single monorepo.
 
 ## Repository Structure
 
@@ -108,7 +108,9 @@ Product and planning artifacts live in `docs/`, including:
 
 - `docs/PRD.md`
 - `docs/BusinessCase.md`
+- `docs/FunctionalFlow.md`
 - `docs/Narrative.md`
+- `docs/tickets/`
 - `docs/phases/`
 
 ## Deployment and Immediate Roadmap

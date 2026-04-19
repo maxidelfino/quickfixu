@@ -1,5 +1,15 @@
 # Proposal: Fase 4 - Payments & Appointments
 
+> **Historical artifact note (April 2026):** This phase document reflects the pre-pivot V1 plan where QuickFixU acted as a payment intermediary.
+>
+> For the current V1 scope, payment/escrow/commission/payout assumptions here are **superseded** by:
+> - `docs/PRD.md`
+> - `docs/FunctionalFlow.md`
+> - `docs/BusinessCase.md`
+> - `docs/tickets/2026-04-v1-marketplace-pivot.md`
+>
+> Keep this file as history only. Do **not** use it as the source of truth for current V1 planning.
+
 **Change:** `fase-4-payments-appointments`  
 **Date:** Marzo 2026  
 **Status:** Proposal  

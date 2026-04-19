@@ -13,6 +13,45 @@ datasource db {
   extensions = [postgis]
 }
 
+enum RequestStatus {
+  draft
+  published
+  receiving_proposals
+  in_coordination
+  closed
+  completed
+  expired
+}
+
+enum ProposalStatus {
+  sent
+  viewed
+  accepted
+  rejected
+  expired
+  withdrawn
+}
+
+enum AppointmentStatus {
+  coordinating
+  scheduled
+  in_progress
+  pending_completion_confirmation
+  completed
+  cancelled
+}
+
+enum RequestMediaType {
+  image
+  video
+}
+
+enum AppointmentCancellationActor {
+  client
+  professional
+  system
+}
+
 // ============================================================
 // USER MODELS
 // ============================================================
@@ -40,6 +79,7 @@ model User {
   // Relations
   professional     Professional?
   refreshTokens    RefreshToken[]
+  requests         Request[]
   
   // Indexes
   @@index([email])
@@ -60,6 +100,7 @@ model Professional {
   user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   categories           ProfessionalCategory[]
   certifications       Certification[]
+  proposals            Proposal[]
   
   @@index([userId])
   @@map("professionals")
@@ -74,6 +115,7 @@ model Category {
 
   // Relations
   professionals  ProfessionalCategory[]
+  requests       RequestCategory[]
   
   @@index([slug])
   @@map("categories")
@@ -109,6 +151,118 @@ model Certification {
   @@index([professionalId])
   @@index([status])
   @@map("certifications")
+}
+
+// ============================================================
+// MARKETPLACE V1 FOUNDATION MODELS
+// ============================================================
+
+model Request {
+  id           Int           @id @default(autoincrement())
+  userId       Int           @map("user_id")
+  title        String        @db.VarChar(100)
+  description  String        @db.Text
+  latitude     Decimal       @db.Decimal(10, 8)
+  longitude    Decimal       @db.Decimal(11, 8)
+  status       RequestStatus @default(draft)
+  expiresAt    DateTime      @map("expires_at") @db.Timestamptz
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories   RequestCategory[]
+  media        RequestMedia[]
+  proposals    Proposal[]
+  appointments Appointment[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@index([latitude, longitude])
+  @@map("requests")
+}
+
+model RequestCategory {
+  requestId  Int @map("request_id")
+  categoryId Int @map("category_id")
+
+  // Relations
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([requestId, categoryId])
+  @@index([requestId])
+  @@index([categoryId])
+  @@map("request_categories")
+}
+
+model RequestMedia {
+  id        Int              @id @default(autoincrement())
+  requestId Int              @map("request_id")
+  mediaType RequestMediaType @map("media_type")
+  mediaUrl  String           @map("media_url") @db.VarChar(500)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("request_media")
+}
+
+model Proposal {
+  id              Int            @id @default(autoincrement())
+  requestId       Int            @map("request_id")
+  professionalId  Int            @map("professional_id")
+  priceReference  Decimal        @map("price_reference") @db.Decimal(10, 2)
+  scopeNotes      String         @map("scope_notes") @db.Text
+  proposedDate    DateTime?      @map("proposed_date") @db.Date
+  proposedTime    DateTime?      @map("proposed_time") @db.Time(0)
+  status          ProposalStatus @default(sent)
+  expiresAt       DateTime       @map("expires_at") @db.Timestamptz
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  request         Request       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  professional    Professional  @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  appointment     Appointment?
+
+  @@index([requestId])
+  @@index([professionalId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("proposals")
+}
+
+model Appointment {
+  id                               Int                           @id @default(autoincrement())
+  proposalId                       Int @unique @map("proposal_id")
+  requestId                        Int                           @map("request_id")
+  scheduledDate                    DateTime?                     @map("scheduled_date") @db.Date
+  scheduledTime                    DateTime?                     @map("scheduled_time") @db.Time(0)
+  status                           AppointmentStatus             @default(coordinating)
+  rescheduledCount                 Int                           @default(0) @map("rescheduled_count")
+  cancellationReason               String?                       @map("cancellation_reason") @db.Text
+  cancelledBy                      AppointmentCancellationActor? @map("cancelled_by")
+  clientConfirmedCompletionAt      DateTime?                     @map("client_confirmed_completion_at") @db.Timestamptz
+  professionalConfirmedCompletionAt DateTime?                    @map("professional_confirmed_completion_at") @db.Timestamptz
+  completedAt                      DateTime?                     @map("completed_at") @db.Timestamptz
+  createdAt                        DateTime                      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                        DateTime                      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  proposal                         Proposal                      @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+  request                          Request                       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([status])
+  @@index([scheduledDate])
+  @@map("appointments")
 }
 
 // ============================================================
