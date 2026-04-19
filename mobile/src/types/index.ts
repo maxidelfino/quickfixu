@@ -106,6 +106,25 @@ export interface Certification {
   uploadedAt: string;
 }
 
+// Review Types - aligned with backend GET /api/professionals/:id/reviews
+export interface Review {
+  id: number;
+  appointmentId: number;
+  reviewerUserId: number;
+  reviewerFullName: string;
+  reviewerProfilePhotoUrl: string | null;
+  reviewedUserId: number;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface ReviewsResponse {
+  professionalId: number;
+  reviews: Review[];
+  total: number;
+}
+
 // Profile Update Types
 export interface ProfileUpdateData {
   fullName?: string;
@@ -168,25 +187,64 @@ export type MainStackParamList = {
   ProfessionalDetail: { professionalId: string };
 };
 
-// Post Types
+// =============================================================================
+// REQUEST / POST VOCABULARY — QuickFixU V1 Marketplace Alignment
+// =============================================================================
+//
+// Canonical V1 term:  `Request`  — client-published marketplace need
+// Legacy mobile term: `Post`    — kept as alias during migration only
+//
+// Both types are identical. `Post` will be removed once backend/routes migrate
+// from `/posts` to `/requests`. Until then, the code uses `Request` internally
+// and `Post` at the service boundary for API compatibility.
+//
+// V1 lifecycle states (canonical):
+//   draft → published → receiving_proposals → in_coordination → completed/closed/expired
+//
+// See: docs/backend/V1BackendContracts.md §3 + §5.1
+//      docs/backend/V1MarketplaceLifecycle.md §2 + §4.1
+// =============================================================================
+
 export type UrgencyLevel = 'normal' | 'urgent';
 
-export interface Post {
+/** Canonical V1 request status — matches backend RequestStatus enum */
+export type RequestStatus =
+  | 'draft'
+  | 'published'
+  | 'receiving_proposals'
+  | 'in_coordination'
+  | 'closed'
+  | 'completed'
+  | 'expired';
+
+/**
+ * Canonical V1 entity: represents a client need published to the marketplace.
+ * Professionals respond with Proposals; the client selects one → creates Appointment.
+ */
+export interface Request {
   id: string;
   title: string;
   description: string;
   categoryId: string;
   location: string;
   preferredDate?: string;
-  budget?: number;
+  budget?: number;           // Reference only — not a transaction, not stored by the platform
   images?: string[];
   userId: string;
   urgency: UrgencyLevel;
-  status: 'pending' | 'assigned' | 'completed' | 'cancelled';
+  status: RequestStatus;
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * Legacy mobile alias — will be removed after backend migrates /posts → /requests.
+ * All new code should import `Request` instead.
+ * @deprecated Use `Request` — alias kept for API compatibility during migration
+ */
+export type Post = Request;
+
+/** Legacy alias for `CreatePostData` — prefer `CreateRequestData` in new code */
 export interface CreatePostData {
   title: string;
   description: string;
@@ -194,6 +252,21 @@ export interface CreatePostData {
   location: string;
   preferredDate?: string;
   budget?: number;
+  images?: string[];
+  urgency: UrgencyLevel;
+}
+
+/**
+ * Canonical creation payload for a V1 request.
+ * `budget` is a commercial reference only — V1 does not process payment.
+ */
+export interface CreateRequestData {
+  title: string;
+  description: string;
+  categoryId: string;
+  location: string;
+  preferredDate?: string;
+  budget?: number;           // Reference/estimate — payment is agreed externally
   images?: string[];
   urgency: UrgencyLevel;
 }

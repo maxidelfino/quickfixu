@@ -143,7 +143,7 @@ const CreatePostScreen: React.FC = () => {
           <View style={styles.header}>
             <Text style={styles.title}>Nueva Solicitud</Text>
             <Text style={styles.subtitle}>
-              Completá los datos del servicio que necesitás
+              Los profesionales te enviarán propuestas para coordinar el trabajo. El pago se acuerda por fuera de la app.
             </Text>
           </View>
 
@@ -157,7 +157,7 @@ const CreatePostScreen: React.FC = () => {
                 setFormData({ ...formData, category })
               }
               error={errors.category}
-              placeholder="¿Qué tipo de servicio necesitás?"
+              placeholder="¿Qué tipo de problema o solicitud querés publicar?"
             />
           </View>
 
@@ -188,6 +188,9 @@ const CreatePostScreen: React.FC = () => {
               helperText={`${formData.description.length}/500 caracteres`}
               maxLength={500}
             />
+            <Text style={styles.sectionHint}>
+              Los profesionales te enviarán propuestas para coordinar el trabajo.
+            </Text>
           </View>
 
           {/* Location */}
@@ -212,14 +215,14 @@ const CreatePostScreen: React.FC = () => {
                 setFormData({ ...formData, preferredDate: date })
               }
               error={errors.preferredDate}
-              placeholder="¿Cuándo necesitás el servicio?"
+              placeholder="¿Cuándo preferís coordinar la visita o el trabajo?"
               minimumDate={new Date()}
             />
           </View>
 
           {/* Budget */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Presupuesto (Opcional)</Text>
+            <Text style={styles.sectionTitle}>Referencia de presupuesto (Opcional)</Text>
             <Input
               value={formData.budget}
               onChangeText={(text) =>
@@ -228,7 +231,7 @@ const CreatePostScreen: React.FC = () => {
               placeholder="Monto estimado en pesos"
               error={errors.budget}
               keyboardType="numeric"
-              hint="Dejá en blanco si no tenés un presupuesto definido"
+              hint="Es una referencia para profesionales. El pago se acuerda por fuera de la app."
             />
           </View>
 
@@ -313,6 +316,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  sectionHint: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
+    marginTop: SPACING.xs,
+    lineHeight: 20,
   },
   submitSection: {
     marginTop: SPACING.lg,

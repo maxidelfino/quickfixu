@@ -110,13 +110,12 @@ const PostPreviewScreen: React.FC = () => {
       await postService.createPost(postData, token);
 
       Alert.alert(
-        '¡Publicación creada! 🎉',
-        'Tu solicitud de servicio ha sido publicada exitosamente. Los profesionales pronto podrán contactarte.',
+        '¡Solicitud publicada! 🎉',
+        'Tu solicitud ya está visible. Recibirás propuestas de profesionales para coordinar el trabajo. El pago se acuerda por fuera de la app.',
         [
           {
-            text: 'Ver mis publicaciones',
+            text: 'Volver al inicio',
             onPress: () => {
-              // Navigate to Home
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Home' }],
@@ -131,11 +130,11 @@ const PostPreviewScreen: React.FC = () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       
       Alert.alert(
-        '¡Publicación creada! 🎉',
-        'Tu solicitud de servicio ha sido publicada exitosamente. Los profesionales pronto podrán contactarte.',
+        '¡Solicitud publicada! 🎉',
+        'Tu solicitud ya está visible. Ahora podrás recibir propuestas y coordinar el trabajo desde la app. El pago se acuerda por fuera.',
         [
           {
-            text: 'Ver mis publicaciones',
+            text: 'Volver al inicio',
             onPress: () => {
               navigation.reset({
                 index: 0,
@@ -159,9 +158,9 @@ const PostPreviewScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Vista Previa</Text>
+          <Text style={styles.title}>Vista Previa de Solicitud</Text>
           <Text style={styles.subtitle}>
-            Revisá que todo esté correcto antes de publicar
+            Revisá los datos. Una vez publicada, recibirás propuestas de profesionales para coordinar el trabajo.
           </Text>
         </View>
 
@@ -215,11 +214,14 @@ const PostPreviewScreen: React.FC = () => {
 
         {/* Budget */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Presupuesto</Text>
+          <Text style={styles.sectionLabel}>Referencia de Presupuesto</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>💰</Text>
             <Text style={styles.budgetText}>{formatBudget(budget)}</Text>
           </View>
+          <Text style={styles.helperText}>
+            El pago se acuerda por fuera de QuickFixU entre cliente y profesional.
+          </Text>
         </View>
 
         {/* Photos */}
@@ -359,6 +361,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
     color: COLORS.success,
+  },
+  helperText: {
+    marginTop: SPACING.xs,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
+    lineHeight: 20,
   },
   imagesContainer: {
     gap: SPACING.sm,
