@@ -4,6 +4,7 @@ import { Professional } from '../../types';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
 import Badge from '../atoms/Badge';
 import DistanceBadge from '../atoms/DistanceBadge';
+import Icon from '../atoms/Icon';
 
 interface ProfessionalCardProps {
   professional: Professional;
@@ -49,7 +50,7 @@ const ProfessionalCard: React.FC<ProfessionalCardProps> = ({
           )}
           {isVerified && (
             <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedIcon}>✓</Text>
+              <Icon name="check" size="xs" color={COLORS.white} strokeWidth={2.8} />
             </View>
           )}
         </View>
@@ -59,7 +60,7 @@ const ProfessionalCard: React.FC<ProfessionalCardProps> = ({
           </View>
           {rating > 0 && (
             <View style={styles.ratingContainer}>
-              <Text style={styles.starIcon}>⭐</Text>
+              <Icon name="star" size="xs" color={COLORS.accent} style={styles.starIcon} />
               <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
               <Text style={styles.reviewCountText}>({reviewCount})</Text>
             </View>
@@ -72,7 +73,7 @@ const ProfessionalCard: React.FC<ProfessionalCardProps> = ({
             ))}
           </View>
         </View>
-        <Text style={styles.arrowIcon}>›</Text>
+        <Icon name="chevron-right" size="md" color={COLORS.gray400} style={styles.arrowIcon} />
       </TouchableOpacity>
     );
   }
@@ -97,7 +98,7 @@ const ProfessionalCard: React.FC<ProfessionalCardProps> = ({
           </Text>
           {rating > 0 && (
             <View style={styles.compactRating}>
-              <Text style={styles.starIcon}>⭐</Text>
+              <Icon name="star" size="xs" color={COLORS.accent} style={styles.starIcon} />
               <Text style={styles.compactRatingText}>{rating.toFixed(1)}</Text>
             </View>
           )}
@@ -123,7 +124,7 @@ const ProfessionalCard: React.FC<ProfessionalCardProps> = ({
         )}
         {isVerified && (
           <View style={styles.verifiedBadge}>
-            <Text style={styles.verifiedIcon}>✓</Text>
+            <Icon name="check" size="xs" color={COLORS.white} strokeWidth={2.8} />
           </View>
         )}
       </View>
@@ -138,7 +139,7 @@ const ProfessionalCard: React.FC<ProfessionalCardProps> = ({
         </View>
         {rating > 0 && (
           <View style={styles.ratingContainer}>
-            <Text style={styles.starIcon}>⭐</Text>
+            <Icon name="star" size="xs" color={COLORS.accent} style={styles.starIcon} />
             <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
             <Text style={styles.reviewCountText}>({reviewCount})</Text>
           </View>
@@ -204,11 +205,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  verifiedIcon: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: FONT_WEIGHT.bold,
-  },
   content: {
     flex: 1,
   },
@@ -231,7 +227,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   starIcon: {
-    fontSize: 14,
     marginRight: 2,
   },
   ratingText: {
@@ -367,8 +362,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   arrowIcon: {
-    fontSize: 24,
-    color: COLORS.gray400,
     marginLeft: SPACING.sm,
   },
 });
