@@ -15,20 +15,20 @@ interface OnboardingScreenProps {
 const ONBOARDING_DATA: OnboardingData[] = [
   {
     title: 'Bienvenido a QuickFixU',
-    subtitle: 'La app que conecta clientes con profesionales cerca de ti',
+    subtitle: 'La app que conecta clientes con profesionales verificados cerca de ti',
     icon: '🏠',
     backgroundColor: COLORS.primary,
   },
   {
-    title: 'Publicá lo que necesitás',
-    subtitle: 'Describe tu problema y recibí presupuestos de profesionales verificados',
-    icon: '📝',
+    title: 'Encontrá profesionales o publicá tu solicitud',
+    subtitle: 'Describe tu problema, recibí propuestas y coordiná el trabajo directamente',
+    icon: '🔍',
     backgroundColor: COLORS.primaryLight,
   },
   {
-    title: 'Hacé crecer tu negocio',
-    subtitle: 'Encontrá clientes que necesitan tus servicios y construí tu reputación',
-    icon: '💼',
+    title: 'Pagá fuera de la app',
+    subtitle: 'Confirmá la finalización del trabajo y acordá el pago directamente con el profesional',
+    icon: '💳',
     backgroundColor: COLORS.accent,
   },
 ];

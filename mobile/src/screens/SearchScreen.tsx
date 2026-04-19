@@ -14,13 +14,15 @@ import { userService, SearchFilters, SearchProfessionalsResponse } from '../serv
 import { Category, Professional } from '../types';
 import { SearchBar, FilterChip, ProfessionalCard } from '../components/molecules';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../constants/config';
+import Icon, { type IconName } from '../components/atoms/Icon';
+import { CATEGORY_ICON_NAMES } from '../constants/iconography';
 
 const SORT_OPTIONS = [
-  { key: 'nearest', label: 'Cerca', icon: '📍' },
-  { key: 'best_rated', label: 'Mejor valorados', icon: '⭐' },
-  { key: 'most_reviews', label: 'Más reseñas', icon: '💬' },
-  { key: 'newest', label: 'Nuevos', icon: '✨' },
-];
+  { key: 'nearest', label: 'Cerca', icon: 'location' },
+  { key: 'best_rated', label: 'Mejor valorados', icon: 'star' },
+  { key: 'most_reviews', label: 'Más reseñas', icon: 'message' },
+  { key: 'newest', label: 'Nuevos', icon: 'sparkles' },
+] satisfies Array<{ key: SearchFilters['sortBy']; label: string; icon: IconName }>;
 
 const DISTANCE_OPTIONS = [
   { key: 'any', label: 'Cualquier distancia', value: undefined },
@@ -30,17 +32,7 @@ const DISTANCE_OPTIONS = [
   { key: '10', label: '10 km', value: 10 },
 ];
 
-const CATEGORY_ICONS: Record<string, string> = {
-  'electricidad': '⚡',
-  'plomeria': '🔧',
-  'gas': '🔥',
-  'carpinteria': '🪵',
-  'pintura': '🎨',
-  'jardineria': '🌿',
-  'limpieza': '🧹',
-  'aire-acondicionado': '❄️',
-  'default': '🔨',
-};
+const CATEGORY_ICONS: Record<string, IconName> = CATEGORY_ICON_NAMES;
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -322,7 +314,7 @@ const SearchScreen: React.FC = () => {
         >
           <FilterChip
             label="Todas"
-            icon="🏷️"
+            icon="tags"
             selected={selectedCategory === null}
             onPress={() => setSelectedCategory(null)}
           />
@@ -350,7 +342,7 @@ const SearchScreen: React.FC = () => {
             <FilterChip
               key={option.key}
               label={option.label}
-              icon="📍"
+              icon="location"
               selected={maxDistance === option.value}
               onPress={() => setMaxDistance(option.value)}
             />
@@ -392,12 +384,12 @@ const SearchScreen: React.FC = () => {
     
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>🔍</Text>
-        <Text style={styles.emptyTitle}>No se encontraron profesionales</Text>
+        <Icon name="search" size={36} color={COLORS.gray400} style={styles.emptyIcon} />
+        <Text style={styles.emptyTitle}>Sin resultados</Text>
         <Text style={styles.emptyDescription}>
           {searchQuery 
-            ? `No hay resultados para "${searchQuery}"`
-            : 'Probá seleccionando otra categoría o cambiando el orden'
+            ? `No hay profesionales para "${searchQuery}"`
+            : 'No hay profesionales en esta categoría. Probá seleccionando otra o cambiando el orden.'
           }
         </Text>
         {selectedCategory && (
@@ -523,7 +515,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
   },
   emptyIcon: {
-    fontSize: 64,
     marginBottom: SPACING.md,
   },
   emptyTitle: {

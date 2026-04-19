@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../constants/config';
+import Icon from '../components/atoms/Icon';
 
 interface Message {
   id: string;
@@ -21,7 +22,7 @@ const mockMessages: Message[] = [
   {
     id: '1',
     name: 'Juan Pérez',
-    lastMessage: 'Perfecto, mañana a las 10 está bien',
+    lastMessage: 'Perfecto, mañana a las 10 coordinamos la visita',
     time: '10:30',
     avatar: '👨',
     unread: true,
@@ -29,7 +30,7 @@ const mockMessages: Message[] = [
   {
     id: '2',
     name: 'María González',
-    lastMessage: 'Gracias por la cotización',
+    lastMessage: 'Gracias por la propuesta, te confirmo en un rato',
     time: 'Ayer',
     avatar: '👩',
     unread: false,
@@ -64,7 +65,8 @@ const MessagesScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Mensajes</Text>
+        <Text style={styles.title}>Conversaciones</Text>
+        <Text style={styles.subtitle}>Coordiná con profesionales</Text>
       </View>
 
       {/* Messages List */}
@@ -75,10 +77,10 @@ const MessagesScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💬</Text>
-            <Text style={styles.emptyTitle}>No tenés mensajes</Text>
+            <Icon name="message" size={40} color={COLORS.gray400} style={styles.emptyIcon} />
+            <Text style={styles.emptyTitle}>No tenés conversaciones</Text>
             <Text style={styles.emptyDescription}>
-              Cuando contactes a un profesional, los verás aquí
+              Cuando recibas propuestas de profesionales o aceptes una coordinación, la conversación aparecerá acá
             </Text>
           </View>
         }
@@ -101,6 +103,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xxl,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.white,
+  },
+  subtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.white + 'CC',
+    marginTop: SPACING.xs,
   },
   listContent: {
     padding: SPACING.md,
@@ -175,7 +182,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xxl,
   },
   emptyIcon: {
-    fontSize: 64,
     marginBottom: SPACING.md,
   },
   emptyTitle: {

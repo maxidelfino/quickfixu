@@ -14,28 +14,17 @@ import { userService } from '../services';
 import { Category, Professional, MainStackParamList } from '../types';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../constants/config';
 import { StepCard, CategoryGrid } from '../components';
+import Icon from '../components/atoms/Icon';
 import ProfessionalCard from '../components/molecules/ProfessionalCard';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-const DEFAULT_ICONS: Record<string, string> = {
-  electricidad: '⚡',
-  plomeria: '🔧',
-  gas: '🔥',
-  carpinteria: '🪵',
-  pintura: '🎨',
-  jardineria: '🌿',
-  limpieza: '🧹',
-  'aire-acondicionado': '❄️',
-  default: '🔨',
-};
-
 // Professional counts are loaded from API — no mock data to avoid showing wrong numbers
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: '1', name: 'Electricista', slug: 'electricidad', icon: '⚡' },
-  { id: '2', name: 'Plomero', slug: 'plomeria', icon: '🔧' },
-  { id: '3', name: 'Gasista', slug: 'gas', icon: '🔥' },
+  { id: '1', name: 'Electricista', slug: 'electricidad', icon: 'electrical' },
+  { id: '2', name: 'Plomero', slug: 'plomeria', icon: 'wrench' },
+  { id: '3', name: 'Gasista', slug: 'gas', icon: 'flame' },
 ];
 
 const FEATURED_PROFESSIONALS: Professional[] = [
@@ -167,7 +156,7 @@ const HomeScreen: React.FC = () => {
           </Text>
         </View>
         <View style={styles.heroDecoration}>
-          <Text style={styles.heroIcon}>🔧</Text>
+          <Icon name="wrench" size={40} color={COLORS.white} strokeWidth={2.1} />
         </View>
       </View>
 
@@ -178,7 +167,7 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.userName}>{user?.name || 'Usuario'}</Text>
         </View>
         <TouchableOpacity style={styles.notificationButton}>
-          <Text style={styles.notificationIcon}>🔔</Text>
+          <Icon name="bell" size="md" color={COLORS.gray700} />
         </TouchableOpacity>
       </View>
 
@@ -187,8 +176,8 @@ const HomeScreen: React.FC = () => {
         style={styles.searchBar}
         onPress={() => navigation.navigate('SearchTab' as any)}
       >
-        <Text style={styles.searchIcon}>🔍</Text>
-        <Text style={styles.searchText}>¿Qué servicio necesitás?</Text>
+        <Icon name="search" size="sm" color={COLORS.gray500} style={styles.searchIcon} />
+          <Text style={styles.searchText}>¿Qué problema o solicitud querés resolver?</Text>
       </TouchableOpacity>
 
       {/* How It Works Section */}
@@ -197,21 +186,21 @@ const HomeScreen: React.FC = () => {
         <View style={styles.stepsContainer}>
           <StepCard
             stepNumber={1}
-            icon="🔍"
-            title="Buscá"
-            description="Encontrá el profesional que necesitás"
+            icon="search"
+            title="Encontrá o publicá"
+            description="Buscá profesionales o publicá tu solicitud"
           />
           <StepCard
             stepNumber={2}
-            icon="💬"
-            title="Contactá"
-            description="Chatea directamente con el profesional"
+            icon="proposal"
+            title="Recibí propuestas"
+            description="Revisá presupuestos y coordiá detalles directamente"
           />
           <StepCard
             stepNumber={3}
-            icon="✅"
-            title="Contratá"
-            description="Acordá el servicio y horario"
+            icon="check"
+            title="Confirmá y pagá"
+            description="Confirmá la finalización y resolvé el pago por fuera"
           />
         </View>
       </View>
@@ -266,7 +255,7 @@ const HomeScreen: React.FC = () => {
       onPress={() => navigation.navigate('CreatePost')}
       activeOpacity={0.8}
     >
-      <Text style={styles.fabIcon}>+</Text>
+      <Icon name="plus" size={26} color={COLORS.white} strokeWidth={2.4} />
     </TouchableOpacity>
     </View>
   );
@@ -312,9 +301,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroIcon: {
-    fontSize: 40,
-  },
   // Greeting Card
   greetingCard: {
     flexDirection: 'row',
@@ -348,9 +334,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notificationIcon: {
-    fontSize: 20,
-  },
   // Search Bar
   searchBar: {
     flexDirection: 'row',
@@ -367,7 +350,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchIcon: {
-    fontSize: 18,
     marginRight: SPACING.sm,
   },
   searchText: {
@@ -440,12 +422,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
-  },
-  fabIcon: {
-    fontSize: 32,
-    color: COLORS.white,
-    fontWeight: '300',
-    marginTop: -2,
   },
 });
 
