@@ -38,10 +38,13 @@ Si alguien necesita entender QuickFixU hoy, este es el orden correcto:
 1. `PRD.md`
 2. `FunctionalFlow.md`
 3. `BusinessCase.md`
-4. `tickets/2026-04-v1-marketplace-pivot.md`
-5. `backend/V1BackendContracts.md`
-6. `backend/V1SubscriptionBoundary.md`
-7. `database/DataModel.md`
+4. `V1PlanningReconciliation.md` — contrasta estado actual vs fases históricas y define qué queda por hacer
+5. `tickets/2026-04-v1-marketplace-pivot.md`
+6. `backend/V1BackendContracts.md`
+7. `backend/V1SubscriptionBoundary.md`
+8. `database/DataModel.md`
+
+Para planificación de la siguiente tanda de trabajo, comenzar por `V1PlanningReconciliation.md` y los tickets tech-06, tech-07, tech-08 y tech-10.
 
 ## 5. Regla de mantenimiento
 
