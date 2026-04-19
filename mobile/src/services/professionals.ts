@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../constants/config';
-import { Certification, UserBackend, ProfileUpdateData } from '../types';
+import { Certification, UserBackend, ProfileUpdateData, ReviewsResponse } from '../types';
 
 // Mock data for development (when API is not ready)
 const MOCK_CERTIFICATIONS: Certification[] = [
@@ -173,6 +173,27 @@ class ProfessionalsService {
     } catch (error) {
       console.warn('Delete certification API not available, simulating delete');
       // Silently succeed in mock mode
+    }
+  }
+
+  /**
+   * Get public reviews for a professional (no auth required)
+   * Graceful fallback returns empty reviews if API unavailable.
+   * @param professionalId The professional's ID
+   */
+  async getProfessionalReviews(professionalId: number): Promise<ReviewsResponse> {
+    try {
+      return await this.request<ReviewsResponse>(
+        `/api/professionals/${professionalId}/reviews`
+      );
+    } catch (error) {
+      console.warn('Public reviews API unavailable, returning empty response');
+      // Return empty response for graceful degradation — screen will show "Sin reseñas aún"
+      return {
+        professionalId,
+        reviews: [],
+        total: 0,
+      };
     }
   }
 }

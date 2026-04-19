@@ -11,8 +11,9 @@ import {
   Linking,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import { MainStackParamList } from '../types';
+import { MainStackParamList, Review, ReviewsResponse } from '../types';
 import { userService } from '../services/user';
+import { professionalsService } from '../services/professionals';
 import { Professional } from '../types';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../constants/config';
 import Button from '../components/atoms/Button';
@@ -28,11 +29,14 @@ const ProfessionalDetailScreen: React.FC = () => {
   const { professionalId } = route.params;
 
   const [professional, setProfessional] = useState<Professional | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadProfessional();
+    loadReviews();
   }, [professionalId]);
 
   const loadProfessional = async () => {
@@ -47,6 +51,26 @@ const ProfessionalDetailScreen: React.FC = () => {
       setProfessional(getMockProfessional(professionalId));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadReviews = async () => {
+    setReviewsLoading(true);
+    try {
+      // Parse string ID to number for the backend API
+      const numericId = parseInt(professionalId, 10);
+      if (isNaN(numericId)) {
+        console.warn('Invalid professional ID for reviews fetch:', professionalId);
+        setReviews([]);
+        return;
+      }
+      const response: ReviewsResponse = await professionalsService.getProfessionalReviews(numericId);
+      setReviews(response.reviews || []);
+    } catch (err) {
+      console.error('Error loading reviews:', err);
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
@@ -90,8 +114,8 @@ const ProfessionalDetailScreen: React.FC = () => {
   };
 
   const handleRequestQuote = () => {
-    // TODO: Navigate to quote creation screen (Phase 2)
-    Alert.alert('Solicitar Presupuesto', 'Esta función estará disponible en la Fase 2.');
+    // TODO: Connect this action to request/proposal flow in a future iteration.
+    Alert.alert('Pedir propuesta', 'Esta función abrirá la solicitud y la coordinación en una próxima iteración.');
   };
 
   const getInitials = (name: string) => {
@@ -246,6 +270,53 @@ const ProfessionalDetailScreen: React.FC = () => {
             </View>
           </View>
         )}
+
+        {/* Reviews Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Reseñas de clientes</Text>
+          {reviewsLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : reviews.length === 0 ? (
+            <Text style={styles.noReviewsText}>Este profesional aún no tiene reseñas.</Text>
+          ) : (
+            <View style={styles.reviewsList}>
+              {reviews.slice(0, 5).map((review) => (
+                <View key={review.id} style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewerAvatar}>
+                      <Text style={styles.reviewerInitials}>
+                        {review.reviewerFullName?.charAt(0)?.toUpperCase() || 'A'}
+                      </Text>
+                    </View>
+                    <View style={styles.reviewerInfo}>
+                      <Text style={styles.reviewerName}>{review.reviewerFullName}</Text>
+                      <StarRating
+                        rating={review.rating}
+                        size="small"
+                        showValue={false}
+                      />
+                    </View>
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.createdAt).toLocaleDateString('es-AR', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                  {review.comment && (
+                    <Text style={styles.reviewComment}>{review.comment}</Text>
+                  )}
+                </View>
+              ))}
+              {reviews.length > 5 && (
+                <Text style={styles.moreReviewsText}>
+                  + {reviews.length - 5} reseñas más
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       {/* Action Buttons */}
@@ -258,7 +329,7 @@ const ProfessionalDetailScreen: React.FC = () => {
           icon="📱"
         />
         <Button
-          title="Solicitar Presupuesto"
+          title="Pedir propuesta"
           variant="secondary"
           onPress={handleRequestQuote}
           style={styles.quoteButton}
@@ -461,6 +532,64 @@ const styles = StyleSheet.create({
   contactText: {
     fontSize: FONT_SIZE.md,
     color: COLORS.gray700,
+  },
+  noReviewsText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.gray500,
+    fontStyle: 'italic',
+  },
+  reviewsList: {
+    gap: SPACING.md,
+  },
+  reviewItem: {
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  reviewerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  reviewerInitials: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.white,
+  },
+  reviewerInfo: {
+    flex: 1,
+  },
+  reviewerName: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.medium,
+    color: COLORS.gray800,
+    marginBottom: 2,
+  },
+  reviewDate: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.gray400,
+  },
+  reviewComment: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray700,
+    lineHeight: 20,
+    marginLeft: 40, // Align with reviewer name (avatar width + margin)
+  },
+  moreReviewsText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHT.medium,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
   },
   actionButtons: {
     flexDirection: 'row',
