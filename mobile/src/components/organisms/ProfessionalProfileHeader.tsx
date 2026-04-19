@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
 import { Category } from '../../types';
+import { Star } from 'lucide-react-native';
 
 interface ProfessionalProfileHeaderProps {
   name: string;
@@ -45,9 +46,15 @@ const ProfessionalProfileHeader: React.FC<ProfessionalProfileHeaderProps> = ({
     return fullName.substring(0, 2).toUpperCase();
   };
 
-  const renderStars = (ratingValue: number): string => {
+  const renderStars = (ratingValue: number): React.ReactNode[] => {
     const full = Math.round(ratingValue);
-    return '⭐'.repeat(Math.min(full, 5));
+    const stars: React.ReactNode[] = [];
+    for (let i = 0; i < Math.min(full, 5); i++) {
+      stars.push(
+        <Star key={i} size={14} fill="#FFB800" color="#FFB800" strokeWidth={0} />
+      );
+    }
+    return stars;
   };
 
   return (
@@ -106,7 +113,7 @@ const ProfessionalProfileHeader: React.FC<ProfessionalProfileHeaderProps> = ({
         {/* Rating */}
         {rating !== undefined && rating > 0 ? (
           <View style={styles.ratingRow}>
-            <Text style={styles.ratingStars}>{renderStars(rating)}</Text>
+            <View style={styles.ratingStarsContainer}>{renderStars(rating)}</View>
             <Text style={styles.ratingValue}>{Number(rating).toFixed(1)}</Text>
             {reviewCount !== undefined && reviewCount > 0 ? (
               <Text style={styles.reviewCount}>({reviewCount} reseñas)</Text>
@@ -258,8 +265,9 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     marginTop: SPACING.xs,
   },
-  ratingStars: {
-    fontSize: FONT_SIZE.sm,
+  ratingStarsContainer: {
+    flexDirection: 'row',
+    gap: 2,
   },
   ratingValue: {
     fontSize: FONT_SIZE.md,

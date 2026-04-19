@@ -17,6 +17,9 @@ import { userService } from '../services/user';
 import { UserBackend } from '../types';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZE, FONT_WEIGHT } from '../constants/config';
 import { MainStackParamList } from '../types';
+import Icon, { type IconName } from '../components/atoms/Icon';
+import StarRating from '../components/atoms/StarRating';
+import { getCategoryIconName } from '../constants/iconography';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
@@ -106,19 +109,33 @@ const ProfileScreen: React.FC = () => {
   }
 
   const menuItems = [
-    { icon: '📋', title: 'Mis Solicitudes', subtitle: 'Ver historial de servicios' },
-    { icon: '⭐', title: 'Reseñas', subtitle: 'Mis reseñas y calificaciones' },
-    { icon: '💳', title: 'Métodos de Pago', subtitle: 'Gestionar pagos' },
-    { icon: '🔔', title: 'Notificaciones', subtitle: 'Configurar alertas' },
-    { icon: '❓', title: 'Ayuda y Soporte', subtitle: 'Preguntas frecuentes' },
-    { icon: '⚙️', title: 'Configuración', subtitle: 'Ajustes de la app' },
-  ];
+    { icon: 'notebook', title: 'Mis Solicitudes', subtitle: 'Seguir solicitudes, propuestas y cierres' },
+    { icon: 'star', title: 'Reseñas', subtitle: 'Mis reseñas y calificaciones' },
+    { icon: 'badge-check', title: 'Finalización', subtitle: 'Confirmar trabajos completados' },
+    { icon: 'bell', title: 'Notificaciones', subtitle: 'Configurar alertas' },
+    { icon: 'help', title: 'Ayuda y Soporte', subtitle: 'Preguntas frecuentes' },
+    { icon: 'settings', title: 'Configuración', subtitle: 'Ajustes de la app' },
+  ] satisfies Array<{ icon: IconName; title: string; subtitle: string }>;
 
   const professionalMenuItems = [
-    { icon: '📊', title: 'Panel de Profesional', subtitle: 'Gestionar mis servicios' },
-    { icon: '📅', title: 'Agenda', subtitle: 'Ver mis turnos' },
-    { icon: '💰', title: 'Ingresos', subtitle: 'Historial de ganancias' },
-  ];
+    { icon: 'layout-dashboard', title: 'Panel de Profesional', subtitle: 'Gestionar solicitudes y propuestas' },
+    { icon: 'calendar', title: 'Agenda', subtitle: 'Ver coordinaciones y visitas' },
+    { icon: 'badge-check', title: 'Confirmaciones pendientes', subtitle: 'Revisar cierres de trabajos' },
+  ] satisfies Array<{ icon: IconName; title: string; subtitle: string }>;
+
+  const roleIconName: IconName = isProfessional ? 'tool' : 'user';
+  const roleLabel = isProfessional ? 'Profesional' : 'Cliente';
+
+  const renderMenuItem = (item: { icon: IconName; title: string; subtitle: string }, key: string) => (
+    <TouchableOpacity key={key} style={styles.menuItem}>
+      <Icon name={item.icon} size="lg" color={COLORS.gray700} style={styles.menuIcon} />
+      <View style={styles.menuContent}>
+        <Text style={styles.menuTitle}>{item.title}</Text>
+        <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+      </View>
+      <Icon name="chevron-right" size="md" color={COLORS.gray400} />
+    </TouchableOpacity>
+  );
 
   return (
     <ScrollView 
@@ -154,7 +171,7 @@ const ProfileScreen: React.FC = () => {
           {/* Phone */}
           {displayPhone ? (
             <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}>📱</Text>
+              <Icon name="phone" size="xs" color={COLORS.gray500} style={styles.infoIcon} />
               <Text style={styles.infoText}>{displayPhone}</Text>
             </View>
           ) : null}
@@ -162,16 +179,17 @@ const ProfileScreen: React.FC = () => {
           {/* Address */}
           {displayAddress ? (
             <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}>📍</Text>
+              <Icon name="location" size="xs" color={COLORS.gray500} style={styles.infoIcon} />
               <Text style={styles.infoText}>{displayAddress}</Text>
             </View>
           ) : null}
           
           {/* Role Badge */}
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>
-              {isProfessional ? '🔧 Profesional' : '👤 Cliente'}
-            </Text>
+            <View style={styles.roleContent}>
+              <Icon name={roleIconName} size="xs" color={COLORS.accent} style={styles.roleIcon} />
+              <Text style={styles.roleText}>{roleLabel}</Text>
+            </View>
           </View>
         </View>
         
@@ -188,9 +206,12 @@ const ProfileScreen: React.FC = () => {
           {/* Rating */}
           {profile?.rating > 0 && (
             <View style={styles.ratingContainer}>
-              <Text style={styles.ratingStars}>
-                {'⭐'.repeat(Math.round(Number(profile.rating)))}
-              </Text>
+              <StarRating
+                rating={Number(profile.rating)}
+                maxStars={5}
+                size="small"
+                showValue={false}
+              />
               <Text style={styles.ratingText}>
                 {Number(profile.rating).toFixed(1)} ({profile.ratingCount} reseñas)
               </Text>
@@ -200,7 +221,7 @@ const ProfileScreen: React.FC = () => {
           {/* Years of Experience */}
           {professionalData.yearsExperience > 0 && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoIcon}>💼</Text>
+              <Icon name="briefcase" size="xs" color={COLORS.gray500} style={styles.infoIcon} />
               <Text style={styles.infoText}>
                 {professionalData.yearsExperience} años de experiencia
               </Text>
@@ -219,9 +240,15 @@ const ProfileScreen: React.FC = () => {
               <View style={styles.categoriesList}>
                 {professionalData.categories.map((cat) => (
                   <View key={cat.id} style={styles.categoryBadge}>
-                    <Text style={styles.categoryText}>
-                      {cat.icon} {cat.name}
-                    </Text>
+                    <View style={styles.categoryBadgeContent}>
+                      <Icon
+                        name={getCategoryIconName(cat.slug, cat.icon)}
+                        size="xs"
+                        color={COLORS.primary}
+                        style={styles.categoryIcon}
+                      />
+                      <Text style={styles.categoryText}>{cat.name}</Text>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -232,38 +259,23 @@ const ProfileScreen: React.FC = () => {
 
       {/* Menu Items */}
       <View style={styles.menuSection}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity key={index} style={styles.menuItem}>
-            <Text style={styles.menuIcon}>{item.icon}</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-            </View>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        ))}
+        {menuItems.map((item, index) => renderMenuItem(item, `menu-${index}`))}
       </View>
 
       {/* Professional Menu (if applicable) */}
       {isProfessional && (
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Panel de Profesional</Text>
-          {professionalMenuItems.map((item, index) => (
-            <TouchableOpacity key={index} style={styles.menuItem}>
-              <Text style={styles.menuIcon}>{item.icon}</Text>
-              <View style={styles.menuContent}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-              </View>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-          ))}
+          {professionalMenuItems.map((item, index) => renderMenuItem(item, `pro-menu-${index}`))}
         </View>
       )}
 
       {/* Logout */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+        <View style={styles.logoutButtonContent}>
+          <Icon name="logout" size="sm" color={COLORS.error} style={styles.logoutIcon} />
+          <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+        </View>
       </TouchableOpacity>
 
       {/* App Info */}
@@ -349,7 +361,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   infoIcon: {
-    fontSize: 12,
     marginRight: SPACING.xs,
   },
   infoText: {
@@ -368,6 +379,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: FONT_WEIGHT.medium,
     color: COLORS.accent,
+  },
+  roleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  roleIcon: {
+    marginRight: 6,
   },
   editButton: {
     paddingHorizontal: SPACING.md,
@@ -430,6 +448,13 @@ const styles = StyleSheet.create({
     marginRight: SPACING.xs,
     marginBottom: SPACING.xs,
   },
+  categoryBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryIcon: {
+    marginRight: 6,
+  },
   categoryText: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.primary,
@@ -458,7 +483,6 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   menuIcon: {
-    fontSize: 24,
     marginRight: SPACING.md,
   },
   menuContent: {
@@ -474,10 +498,6 @@ const styles = StyleSheet.create({
     color: COLORS.gray500,
     marginTop: 2,
   },
-  menuArrow: {
-    fontSize: 24,
-    color: COLORS.gray400,
-  },
   logoutButton: {
     backgroundColor: COLORS.error + '10',
     marginHorizontal: SPACING.lg,
@@ -485,6 +505,13 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
+  },
+  logoutButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutIcon: {
+    marginRight: SPACING.xs,
   },
   logoutButtonText: {
     color: COLORS.error,

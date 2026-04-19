@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { Star } from 'lucide-react-native';
 import { COLORS, SPACING, FONT_SIZE, FONT_WEIGHT } from '../../constants/config';
 
 interface StarRatingProps {
@@ -53,27 +54,27 @@ const StarRating: React.FC<StarRatingProps> = ({
     // Full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Text key={`full-${i}`} style={[styles.star, { fontSize: starSize }]}>
-          ★
-        </Text>
+        <View key={`full-${i}`} style={styles.starContainer}>
+          <Star size={starSize} fill="#FFB800" color="#FFB800" strokeWidth={0} />
+        </View>
       );
     }
 
-    // Half star
+    // Half star - use full star with slightly different styling
     if (hasHalfStar) {
       stars.push(
-        <Text key="half" style={[styles.star, { fontSize: starSize }]}>
-          ⭐
-        </Text>
+        <View key="half" style={styles.starContainer}>
+          <Star size={starSize} fill="#FFB800" color="#FFB800" strokeWidth={0} />
+        </View>
       );
     }
 
     // Empty stars
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Text key={`empty-${i}`} style={[styles.star, styles.emptyStar, { fontSize: starSize }]}>
-          ☆
-        </Text>
+        <View key={`empty-${i}`} style={styles.starContainer}>
+          <Star size={starSize} color={COLORS.gray300} strokeWidth={1.5} />
+        </View>
       );
     }
 
@@ -107,12 +108,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SPACING.xs,
   },
-  star: {
-    color: '#FFB800',
+  starContainer: {
     marginRight: 2,
-  },
-  emptyStar: {
-    color: COLORS.gray300,
   },
   ratingValue: {
     fontWeight: FONT_WEIGHT.semibold,
