@@ -1,9 +1,7 @@
 // tests/unit/services/geocoding.service.test.ts
 // Unit tests for GeocodingService (isolated from setup.ts global mock)
 
-import axios from 'axios';
 import crypto from 'crypto';
-import { AppError } from '../../../src/types/errors.types';
 
 // We need to test the real GeocodingService class, not the global mock.
 // So we unmock it for this test file.
@@ -22,7 +20,8 @@ jest.mock('../../../src/config/redis', () => ({
   default: mockRedis,
 }));
 
-const mockAxios = axios as jest.Mocked<typeof axios>;
+let mockAxios: jest.Mocked<typeof import('axios').default>;
+let AppErrorClass: typeof import('../../../src/types/errors.types').AppError;
 
 // ============================================================
 // Import AFTER mocks are established
@@ -33,6 +32,10 @@ let geocodingServiceModule: any;
 
 beforeAll(async () => {
   jest.resetModules();
+  const axiosModule = await import('axios');
+  const errorsModule = await import('../../../src/types/errors.types');
+  mockAxios = axiosModule.default as jest.Mocked<typeof axiosModule.default>;
+  AppErrorClass = errorsModule.AppError;
   // Re-import fresh instance with our mocks applied
   geocodingServiceModule = await import('../../../src/services/geocoding.service');
   // Give constructor time to check redis
@@ -107,13 +110,11 @@ describe('GeocodingService', () => {
 
       process.env.GOOGLE_GEOCODING_API_KEY = 'test-key';
 
-      await expect(
-        geocodingServiceModule.geocodingService.geocode('Invalid Address XYZ')
-      ).rejects.toThrow(AppError);
+      const geocodePromise = geocodingServiceModule.geocodingService.geocode('Invalid Address XYZ');
 
-      await expect(
-        geocodingServiceModule.geocodingService.geocode('Invalid Address XYZ')
-      ).rejects.toMatchObject({ statusCode: 503 });
+      await expect(geocodePromise).rejects.toBeInstanceOf(AppErrorClass);
+
+      await expect(geocodePromise).rejects.toMatchObject({ statusCode: 503 });
     });
   });
 
